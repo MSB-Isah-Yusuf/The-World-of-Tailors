@@ -1,0 +1,530 @@
+// StitchCraft - Tailoring & Fabric Marketplace
+// Dev uses SQLite for zero-config; production should switch to postgresql
+// To use Postgres: change provider to "postgresql" and update DATABASE_URL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  TAILOR
+  FABRIC_SELLER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  PENDING_VERIFICATION
+  SUSPENDED
+  REJECTED
+}
+
+enum BusinessStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum BookingStatus {
+  REQUESTED
+  ACCEPTED
+  IN_PRODUCTION
+  READY
+  COMPLETED
+  DECLINED
+  CANCELLED
+  ON_HOLD
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY_FOR_DISPATCH
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+  FAILED_DELIVERY
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum DeliveryType {
+  TO_CUSTOMER
+  TO_TAILOR
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  emailVerified DateTime?
+  passwordHash  String?
+  image         String?
+  role          Role      @default(CUSTOMER)
+  status        UserStatus @default(ACTIVE)
+  phone         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // NextAuth
+  accounts      Account[]
+  sessions      Session[]
+
+  tailorProfile TailorProfile?
+  sellerProfile SellerProfile?
+  customerProfile CustomerProfile?
+
+  tailorBookingsAsCustomer TailoringBooking[] @relation("CustomerBookings")
+  fabricOrders FabricOrder[]
+  reviews      Review[]
+  favorites    Favorite[]
+  notifications Notification[]
+  cart         Cart?
+  addresses    CustomerAddress[]
+  measurementProfiles MeasurementProfile[]
+  auditLogs    AuditLog[]
+
+  @@index([role])
+  @@index([status])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  @@unique([identifier, token])
+}
+
+model TailorProfile {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessName      String
+  slug              String   @unique
+  bio               String?
+  specialties       String   // JSON array
+  services          String?
+  startingPrice     Float?
+  currency          String   @default("NGN")
+  turnaroundDays    Int?
+  experienceYears   Int?
+  profileImage      String?
+  businessStatus    BusinessStatus @default(PENDING)
+  isPublished       Boolean  @default(false)
+  country           String?
+  state             String?
+  city              String?
+  address           String?
+  latitude          Float?
+  longitude         Float?
+  ratingAvg         Float    @default(0)
+  ratingCount       Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  designs           Design[]
+  bookings          TailoringBooking[]
+}
+
+model SellerProfile {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessName      String
+  slug              String   @unique
+  bio               String?
+  categories        String?
+  profileImage      String?
+  businessStatus    BusinessStatus @default(PENDING)
+  isPublished       Boolean  @default(false)
+  country           String?
+  state             String?
+  city              String?
+  address           String?
+  latitude          Float?
+  longitude         Float?
+  deliveryZones     String?  // JSON
+  deliveryMethods   String?
+  businessHours     String?
+  ratingAvg         Float    @default(0)
+  ratingCount       Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  products          FabricProduct[]
+  orders            FabricOrder[]
+}
+
+model CustomerProfile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  avatar    String?
+  bio       String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CustomerAddress {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     String   // Home, Office
+  fullName  String
+  phone     String
+  country   String   @default("Nigeria")
+  state     String
+  city      String
+  street    String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model MeasurementProfile {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String   // e.g. "My Agbada fit"
+  unit      String   @default("cm") // cm or in
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  values    MeasurementValue[]
+}
+
+model MeasurementValue {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   MeasurementProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  key       String   // chest, waist, etc.
+  value     Float
+  unit      String   @default("cm")
+}
+
+model DesignCategory {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  description String?
+  designs   Design[]
+}
+
+model Design {
+  id              String   @id @default(cuid())
+  tailorId        String
+  tailor          TailorProfile @relation(fields: [tailorId], references: [id], onDelete: Cascade)
+  categoryId      String?
+  category        DesignCategory? @relation(fields: [categoryId], references: [id])
+  title           String
+  slug            String   @unique
+  description     String?
+  price           Float?
+  currency        String   @default("NGN")
+  turnaroundDays  Int?
+  isPublished     Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  images          DesignImage[]
+  bookings        TailoringBooking[]
+}
+
+model DesignImage {
+  id        String   @id @default(cuid())
+  designId  String
+  design    Design   @relation(fields: [designId], references: [id], onDelete: Cascade)
+  url       String
+  alt       String?
+  sortOrder Int      @default(0)
+}
+
+model FabricCategory {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  products  FabricProduct[]
+}
+
+model FabricProduct {
+  id              String   @id @default(cuid())
+  sellerId        String
+  seller          SellerProfile @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  categoryId      String?
+  category        FabricCategory? @relation(fields: [categoryId], references: [id])
+  name            String
+  slug            String   @unique
+  description     String?
+  material        String?
+  color           String?
+  pattern         String?
+  price           Float
+  currency        String   @default("NGN")
+  unit            String   @default("metre") // metre, yard, roll, piece
+  stock           Float    @default(0)
+  reserved        Float    @default(0)
+  minOrderQty     Float    @default(1)
+  isPublished     Boolean  @default(false)
+  deliveryEligible Boolean @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  images          FabricProductImage[]
+  orderItems      FabricOrderItem[]
+
+  @@index([sellerId])
+  @@index([isPublished])
+}
+
+model FabricProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  product   FabricProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  alt       String?
+  sortOrder Int      @default(0)
+}
+
+model InventoryMovement {
+  id        String   @id @default(cuid())
+  productId String
+  delta     Float
+  reason    String
+  createdAt DateTime @default(now())
+}
+
+model TailoringBooking {
+  id                  String   @id @default(cuid())
+  reference           String   @unique
+  customerId          String
+  customer            User     @relation("CustomerBookings", fields: [customerId], references: [id])
+  tailorId            String
+  tailor              TailorProfile @relation(fields: [tailorId], references: [id])
+  designId            String?
+  design              Design?  @relation(fields: [designId], references: [id])
+  description         String?
+  specialInstructions String?
+  status              BookingStatus @default(REQUESTED)
+  requestedDate       DateTime @default(now())
+  estimatedCompletion DateTime?
+  agreedPrice         Float?
+  currency            String   @default("NGN")
+  paymentStatus       PaymentStatus @default(PENDING)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  statusHistory       BookingStatusHistory[]
+  notes               BookingNote[]
+  measurementSnapshot Json?
+  deliveries          Delivery[]
+  payments            Payment[]
+}
+
+model BookingStatusHistory {
+  id        String   @id @default(cuid())
+  bookingId String
+  booking   TailoringBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  fromStatus String?
+  toStatus   String
+  changedBy  String?
+  message    String?
+  createdAt  DateTime @default(now())
+}
+
+model BookingNote {
+  id        String   @id @default(cuid())
+  bookingId String
+  booking   TailoringBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  authorId  String?
+  isInternal Boolean @default(false)
+  message   String
+  createdAt DateTime @default(now())
+}
+
+model Cart {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  items     CartItem[]
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  cartId    String
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  quantity  Float
+  createdAt DateTime @default(now())
+}
+
+model FabricOrder {
+  id              String   @id @default(cuid())
+  reference       String   @unique
+  customerId      String
+  customer        User     @relation(fields: [customerId], references: [id])
+  sellerId        String
+  seller          SellerProfile @relation(fields: [sellerId], references: [id])
+  status          OrderStatus @default(PENDING)
+  subtotal        Float
+  deliveryFee     Float    @default(0)
+  total           Float
+  currency        String   @default("NGN")
+  paymentStatus   PaymentStatus @default(PENDING)
+  deliveryType    DeliveryType @default(TO_CUSTOMER)
+  deliveryAddress Json?
+  tailorDestinationId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  items           FabricOrderItem[]
+  deliveries      Delivery[]
+  payments        Payment[]
+}
+
+model FabricOrderItem {
+  id              String   @id @default(cuid())
+  orderId         String
+  order           FabricOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId       String
+  product         FabricProduct @relation(fields: [productId], references: [id])
+  productName     String
+  unit            String
+  priceSnapshot   Float
+  quantity        Float
+  lineTotal       Float
+}
+
+model Delivery {
+  id              String   @id @default(cuid())
+  fabricOrderId   String?
+  fabricOrder     FabricOrder? @relation(fields: [fabricOrderId], references: [id])
+  bookingId       String?
+  booking         TailoringBooking? @relation(fields: [bookingId], references: [id])
+  type            DeliveryType @default(TO_CUSTOMER)
+  address         Json?
+  status          String   @default("PENDING")
+  trackingCode    String?
+  dispatchedAt    DateTime?
+  deliveredAt     DateTime?
+  createdAt       DateTime @default(now())
+  history         DeliveryStatusHistory[]
+}
+
+model DeliveryStatusHistory {
+  id        String   @id @default(cuid())
+  deliveryId String
+  delivery  Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  status    String
+  message   String?
+  createdAt DateTime @default(now())
+}
+
+model Payment {
+  id              String   @id @default(cuid())
+  reference       String   @unique
+  fabricOrderId   String?
+  fabricOrder     FabricOrder? @relation(fields: [fabricOrderId], references: [id])
+  bookingId       String?
+  booking         TailoringBooking? @relation(fields: [bookingId], references: [id])
+  amount          Float
+  currency        String   @default("NGN")
+  provider        String   @default("paystack")
+  providerRef     String?
+  status          PaymentStatus @default(PENDING)
+  createdAt       DateTime @default(now())
+}
+
+model PaymentWebhookEvent {
+  id        String   @id @default(cuid())
+  provider  String
+  eventId   String   @unique
+  payload   Json
+  processed Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  tailorId  String?
+  sellerId  String?
+  designId  String?
+  productId String?
+  rating    Int
+  comment   String?
+  isPublished Boolean @default(true)
+  createdAt DateTime @default(now())
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  designId  String?
+  productId String?
+  createdAt DateTime @default(now())
+  @@unique([userId, designId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String
+  isRead    Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+  @@index([action])
+  @@index([entity])
+}
