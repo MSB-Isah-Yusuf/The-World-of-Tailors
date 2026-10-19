@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Inter, Playfair_Display, Manrope } from "next/font/google";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
-const playfair = Playfair_Display({ subsets: ["latin"], weight: ["400","500","600","700","800"], variable: "--font-playfair" });
-const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope" });
+// Fonts loaded via CSS fallback to avoid Vercel next/font Google fetch failures
+// Using system font stack + editorial web-safe fallback maintains luxury typography without blocking builds
 
 export const metadata: Metadata = {
   title: "The World of Tailors (TWT) — Tailoring & Fabric Marketplace",
@@ -13,8 +11,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${playfair.variable} ${manrope.variable}`}>
-      <body className="min-h-screen bg-ivory text-charcoal">{children}</body>
+    <html lang="en">
+      <body className="min-h-screen bg-ivory text-charcoal antialiased">{children}</body>
     </html>
   );
 }
