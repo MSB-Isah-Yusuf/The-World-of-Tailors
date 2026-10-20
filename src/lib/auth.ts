@@ -4,7 +4,20 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
 
+// Vercel fix: explicit secret + clear error if missing in production
+// AUTH_SECRET must be set in Vercel Env Vars (32+ chars). Generate with: openssl rand -base64 32
+const secret = process.env.AUTH_SECRET;
+if (!secret) {
+  if (process.env.NODE_ENV === "production") {
+    console.error("[auth][MissingSecret] AUTH_SECRET is not set. Add it in Vercel: Settings → Environment Variables → AUTH_SECRET (generate with: openssl rand -base64 32)");
+  } else {
+    console.warn("[auth] AUTH_SECRET missing — using dev fallback (insecure, dev only)");
+  }
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  // Use explicit secret; fallback only for local dev to prevent build-time crash
+  secret: secret || (process.env.NODE_ENV !== "production" ? "dev-fallback-secret-change-me-32chars!!" : undefined),
   adapter: PrismaAdapter(prisma) as any,
   session: { strategy: "jwt", maxAge: 60 * 60 * 24 * 7 },
   providers: [
@@ -36,7 +49,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         (token as any).role = (user as any).role;
         (token as any).uid = (user as any).id;
       }
-      // refresh role/status on each request
       if ((token as any).uid) {
         const dbUser = await prisma.user.findUnique({ where: { id: (token as any).uid } }) as any;
         if (!dbUser || dbUser.status === "SUSPENDED") return null as any;
