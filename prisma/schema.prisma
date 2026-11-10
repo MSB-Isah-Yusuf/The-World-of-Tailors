@@ -528,3 +528,5 @@ model AuditLog {
   @@index([action])
   @@index([entity])
 }
+
+// cache-bust: 2026-11-10T13:46:00Z — force Vercel clean build for postgresql provider
