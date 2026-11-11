@@ -38,7 +38,7 @@ try {
       console.log(`[seed-if-empty] MSB admin ${msbEmail} already exists — skipping`);
     }
   } catch (e2) {
-    console.log("[seed-if-empty] MSB admin ensure skipped:", (e2 as Error).message?.slice(0,120));
+    console.log("[seed-if-empty] MSB admin ensure skipped:", (e2 && e2.message ? e2.message.slice(0,120) : String(e2).slice(0,120)));
   }
 } catch (e) {
   console.error("[seed-if-empty] error:", e);
