@@ -68,6 +68,58 @@ enum DeliveryType {
   TO_TAILOR
 }
 
+// ── New enums for enhancement ──
+enum BodyTemplate {
+  MALE
+  FEMALE
+}
+
+enum MeasurementStatus {
+  NOT_RECORDED
+  IN_PROGRESS
+  COMPLETED
+  AWAITING_CONFIRMATION
+}
+
+enum GarmentType {
+  NATIVE_WEAR
+  SHIRT
+  TROUSERS
+  SUIT
+  GOWN
+  DRESS
+  TRADITIONAL
+  CHILDRENS_WEAR
+  AGBADA
+  KAFTAN
+  BUBU
+  SENATOR
+  CORPORATE
+  WEDDING
+  ANKARA
+  LACE
+  ASO_OKE
+  OTHER
+}
+
+enum ThemePref {
+  LIGHT
+  DARK
+  SYSTEM
+}
+
+enum LanguagePref {
+  EN
+  HA
+}
+
+enum InviteStatus {
+  NOT_INVITED
+  INVITED
+  REGISTERED
+  LINKED
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String
@@ -97,6 +149,8 @@ model User {
   addresses    CustomerAddress[]
   measurementProfiles MeasurementProfile[]
   auditLogs    AuditLog[]
+  preferences  UserPreference?
+  linkedTailorCustomers TailorCustomer[] @relation("UserLinkedTailorCustomer")
 
   @@index([role])
   @@index([status])
@@ -151,11 +205,18 @@ model TailorProfile {
   businessStatus    BusinessStatus @default(PENDING)
   isPublished       Boolean  @default(false)
   country           String?
+  countryCode       String?  @default("NG")
   state             String?
+  stateCode         String?
   city              String?
+  cityId            String?
+  lga               String?
   address           String?
+  street            String?
+  postalCode        String?
   latitude          Float?
   longitude         Float?
+  serviceRadiusKm   Float?   @default(20)
   ratingAvg         Float    @default(0)
   ratingCount       Int      @default(0)
   createdAt         DateTime @default(now())
@@ -163,6 +224,12 @@ model TailorProfile {
 
   designs           Design[]
   bookings          TailoringBooking[]
+  walkInCustomers   TailorCustomer[]
+  measurementProfiles MeasurementProfile[] // tailor-owned measurement profiles
+
+  @@index([state])
+  @@index([city])
+  @@index([businessStatus, isPublished])
 }
 
 model SellerProfile {
@@ -177,13 +244,21 @@ model SellerProfile {
   businessStatus    BusinessStatus @default(PENDING)
   isPublished       Boolean  @default(false)
   country           String?
+  countryCode       String?  @default("NG")
   state             String?
+  stateCode         String?
   city              String?
+  cityId            String?
+  lga               String?
   address           String?
+  street            String?
+  postalCode        String?
   latitude          Float?
   longitude         Float?
   deliveryZones     String?
   deliveryMethods   String?
+  deliveryCoverageKm Float?  @default(25)
+  pickupAvailable   Boolean  @default(true)
   businessHours     String?
   ratingAvg         Float    @default(0)
   ratingCount       Int      @default(0)
@@ -192,6 +267,10 @@ model SellerProfile {
 
   products          FabricProduct[]
   orders            FabricOrder[]
+
+  @@index([state])
+  @@index([city])
+  @@index([businessStatus, isPublished])
 }
 
 model CustomerProfile {
@@ -200,6 +279,7 @@ model CustomerProfile {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   avatar    String?
   bio       String?
+  gender    BodyTemplate? // for mannequin default
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -212,32 +292,101 @@ model CustomerAddress {
   fullName  String
   phone     String
   country   String   @default("Nigeria")
+  countryCode String @default("NG")
   state     String
   city      String
   street    String
   isDefault Boolean  @default(false)
   createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ── Walk-in customer: private to tailor, never public ──
+model TailorCustomer {
+  id            String   @id @default(cuid())
+  tailorId      String
+  tailor        TailorProfile @relation(fields: [tailorId], references: [id], onDelete: Cascade)
+  fullName      String
+  phone         String
+  email         String?
+  gender        BodyTemplate @default(MALE)
+  notes         String?
+  referenceImage String?
+  garmentPreference GarmentType? @default(NATIVE_WEAR)
+  inviteStatus  InviteStatus @default(NOT_INVITED)
+  linkedUserId  String? @unique
+  linkedUser    User?    @relation("UserLinkedTailorCustomer", fields: [linkedUserId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  measurements  MeasurementProfile[]
+
+  @@index([tailorId])
+  @@index([phone])
+  @@unique([tailorId, phone]) // tailor-private dedup, not global
 }
 
 model MeasurementProfile {
   id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String?  // null for walk-in
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tailorId  String?
+  tailor    TailorProfile? @relation(fields: [tailorId], references: [id], onDelete: Cascade)
+  tailorCustomerId String?
+  tailorCustomer TailorCustomer? @relation(fields: [tailorCustomerId], references: [id], onDelete: Cascade)
+  bookingId String?
   name      String
+  garmentType GarmentType @default(NATIVE_WEAR)
+  bodyTemplate BodyTemplate @default(MALE)
+  status    MeasurementStatus @default(COMPLETED)
   unit      String   @default("cm")
   notes     String?
+  recordedBy String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   values    MeasurementValue[]
+  history   MeasurementHistory[]
+
+  @@index([userId])
+  @@index([tailorId])
+  @@index([tailorCustomerId])
 }
 
 model MeasurementValue {
   id        String   @id @default(cuid())
   profileId String
   profile   MeasurementProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  key       String
+  key       String   // e.g. shoulder, chest, waist, inseam
   value     Float
   unit      String   @default("cm")
+}
+
+model MeasurementHistory {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   MeasurementProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  changedBy String?
+  fromJson  Json?
+  toJson    Json?
+  note      String?
+  createdAt DateTime @default(now())
+}
+
+model MeasurementDefinition {
+  id          String   @id @default(cuid())
+  key         String   @unique // shoulder, chest, waist etc.
+  labelEn     String
+  labelHa     String?
+  category    String   // upper_body, waist_torso, lower_body, other
+  garmentTypes GarmentType[] // which garments use this
+  gender      BodyTemplate? // null = both
+  unitDefault String   @default("cm")
+  min         Float?
+  max         Float?
+  helpEn      String?
+  helpHa      String?
+  sortOrder   Int      @default(0)
 }
 
 model DesignCategory {
@@ -261,6 +410,9 @@ model Design {
   currency        String   @default("NGN")
   turnaroundDays  Int?
   isPublished     Boolean  @default(false)
+  isArchived      Boolean  @default(false)
+  tags            String?
+  coverImageId    String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   images          DesignImage[]
@@ -274,6 +426,7 @@ model DesignImage {
   url       String
   alt       String?
   sortOrder Int      @default(0)
+  isCover   Boolean  @default(false)
 }
 
 model FabricCategory {
@@ -527,6 +680,53 @@ model AuditLog {
   createdAt DateTime @default(now())
   @@index([action])
   @@index([entity])
+}
+
+// ── Location reference data (Nigeria 36 + FCT with cities/LGAs) ──
+model Country {
+  code      String @id // NG, GH, etc.
+  name      String @unique
+  dialCode  String?
+  states    StateRegion[]
+}
+
+model StateRegion {
+  id        String @id @default(cuid())
+  countryCode String
+  country   Country @relation(fields: [countryCode], references: [code])
+  name      String
+  code      String? // e.g. LA, AB
+  cities    City[]
+
+  @@unique([countryCode, name])
+  @@index([countryCode])
+}
+
+model City {
+  id        String @id @default(cuid())
+  stateId   String
+  state     StateRegion @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  name      String
+  lga       String?
+  latitude  Float?
+  longitude Float?
+
+  @@index([stateId])
+  @@unique([stateId, name])
+}
+
+// ── User preferences: theme, language, browsing location ──
+model UserPreference {
+  userId      String @id
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  theme       ThemePref @default(SYSTEM)
+  language    LanguagePref @default(EN)
+  browsingCountry String?
+  browsingState   String?
+  browsingCity    String?
+  browsingLat     Float?
+  browsingLng     Float?
+  updatedAt   DateTime @updatedAt
 }
 
 // cache-bust: 2026-11-10T13:46:00Z — force Vercel clean build for postgresql provider
