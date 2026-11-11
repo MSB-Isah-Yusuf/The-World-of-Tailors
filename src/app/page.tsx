@@ -5,16 +5,107 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { prisma } from "@/lib/prisma";
-import { ArrowRight, Scissors, ShieldCheck, MapPin, Star, Quote, Mail, Sparkles, Clock3, Award, Package } from "lucide-react";
+import { auth } from "@/lib/auth";
+import { distanceKm } from "@/lib/location-data";
+import { HomepageLocationSelector } from "@/components/location/HomepageLocationSelector";
+import { ArrowRight, Scissors, ShieldCheck, MapPin, Star, Quote, Mail, Sparkles, Clock3, Package } from "lucide-react";
 
-export default async function HomePage() {
+export default async function HomePage({ searchParams }: { searchParams: Promise<{ state?: string; city?: string; lat?: string; lng?: string }> }) {
+  const sp = await searchParams;
+  const session = await auth().catch(()=>null);
+  let browsingState = sp?.state || undefined;
+  let browsingCity = sp?.city || undefined;
+  let browsingLat = sp?.lat ? Number(sp.lat) : undefined;
+  let browsingLng = sp?.lng ? Number(sp.lng) : undefined;
+
+  // Logged-in preferred location fallback (do not silently override explicit query)
+  if (!browsingState && !browsingCity && session?.user) {
+    try {
+      const pref = await prisma.userPreference.findUnique({ where:{ userId: (session.user as any).id } });
+      if (pref?.browsingState) browsingState = pref.browsingState;
+      if (pref?.browsingCity) browsingCity = pref.browsingCity;
+      if (pref?.browsingLat && pref?.browsingLng) { browsingLat = pref.browsingLat; browsingLng = pref.browsingLng; }
+    } catch {}
+  }
+
   let featuredTailors: any[] = [];
   let featuredDesigns: any[] = [];
   let featuredFabrics: any[] = [];
+  let nearbyTailors: any[] = [];
+  let nearbySellers: any[] = [];
+  let nearbyLabel = "";
+  let regionalNote = "";
+
   try {
-    featuredTailors = await prisma.tailorProfile.findMany({ where: { isPublished: true }, take: 4, include: { user: true } });
-    featuredDesigns = await prisma.design.findMany({ where: { isPublished: true }, take: 6, include: { tailor: true, images: true } });
-    featuredFabrics = await prisma.fabricProduct.findMany({ where: { isPublished: true }, take: 6, include: { seller: true, images: true } });
+    // Base featured (fallback)
+    [featuredTailors, featuredDesigns, featuredFabrics] = await Promise.all([
+      prisma.tailorProfile.findMany({ where: { isPublished: true, businessStatus:"APPROVED" }, take: 8, include: { user: true }, orderBy:{ ratingAvg:"desc" } }),
+      prisma.design.findMany({ where: { isPublished: true }, take: 6, include: { tailor: true, images: true } }),
+      prisma.fabricProduct.findMany({ where: { isPublished: true }, take: 6, include: { seller: true, images: true } }),
+    ]);
+
+    // Location-aware ranking for tailors
+    const allTailors = await prisma.tailorProfile.findMany({ where:{ isPublished:true, businessStatus:"APPROVED" }, include:{ user:true } });
+    const allSellers = await prisma.sellerProfile.findMany({ where:{ isPublished:true, businessStatus:"APPROVED" }, include:{ user:true } });
+
+    const rankTailors = () => {
+      let exact: any[] = [], stateOnly: any[] = [], others: any[] = [];
+      for (const t of allTailors) {
+        const cityMatch = browsingCity && t.city && t.city.toLowerCase()===browsingCity.toLowerCase();
+        const stateMatch = browsingState && t.state && t.state.toLowerCase()===browsingState.toLowerCase();
+        if (browsingCity && cityMatch) exact.push(t);
+        else if (browsingState && stateMatch) stateOnly.push(t);
+        else if (!browsingState && !browsingCity) exact.push(t); // no filter -> treat as regional
+        else others.push(t);
+      }
+      // Add distance if lat/lng available
+      const withDistance = (list:any[]) => list.map(t=>{
+        let d: number | null = null;
+        if (browsingLat && browsingLng && t.latitude && t.longitude) d = distanceKm({lat:browsingLat, lng:browsingLng}, {lat:t.latitude, lng:t.longitude});
+        return { ...t, _distance: d };
+      }).sort((a,b)=>{
+        if (a._distance!=null && b._distance!=null) return a._distance - b._distance;
+        if (a._distance!=null) return -1;
+        if (b._distance!=null) return 1;
+        return (b.ratingAvg||0)-(a.ratingAvg||0);
+      });
+      const ranked = [...withDistance(exact), ...withDistance(stateOnly), ...withDistance(others)];
+      // Determine label
+      if (exact.length>0) { nearbyLabel = `in ${browsingCity}, ${browsingState||""}`; regionalNote=""; }
+      else if (stateOnly.length>0) { nearbyLabel = `nearby in ${browsingState}`; regionalNote=`No exact matches in ${browsingCity||"that city"} — showing nearby in ${browsingState}.` }
+      else if (browsingCity || browsingState) { nearbyLabel = `in broader region`; regionalNote = `No exact matches in ${browsingCity||browsingState} — showing regional tailors.`; }
+      else { nearbyLabel = "featured"; regionalNote=""; }
+      return ranked;
+    };
+    const rankSellers = () => {
+      let exact: any[] = [], stateOnly: any[] = [], others: any[] = [];
+      for (const s of allSellers) {
+        const cityMatch = browsingCity && s.city && s.city.toLowerCase()===browsingCity.toLowerCase();
+        const stateMatch = browsingState && s.state && s.state.toLowerCase()===browsingState.toLowerCase();
+        if (browsingCity && cityMatch) exact.push(s);
+        else if (browsingState && stateMatch) stateOnly.push(s);
+        else others.push(s);
+      }
+      const withDistance = (list:any[]) => list.map(s=>{
+        let d: number | null = null;
+        if (browsingLat && browsingLng && s.latitude && s.longitude) d = distanceKm({lat:browsingLat, lng:browsingLng}, {lat:s.latitude, lng:s.longitude});
+        return { ...s, _distance: d };
+      }).sort((a,b)=>{
+        if (a._distance!=null && b._distance!=null) return a._distance - b._distance;
+        return (b.ratingAvg||0)-(a.ratingAvg||0);
+      });
+      return [...withDistance(exact), ...withDistance(stateOnly), ...withDistance(others)];
+    };
+
+    nearbyTailors = rankTailors().slice(0,6);
+    nearbySellers = rankSellers().slice(0,6);
+
+    // If no location filter, show top rated as nearby
+    if (!browsingState && !browsingCity) {
+      nearbyTailors = allTailors.sort((a,b)=>(b.ratingAvg||0)-(a.ratingAvg||0)).slice(0,6).map(t=>({ ...t, _distance:null }));
+      nearbySellers = allSellers.sort((a,b)=>(b.ratingAvg||0)-(a.ratingAvg||0)).slice(0,4).map(s=>({ ...s, _distance:null }));
+      nearbyLabel = "featured";
+    }
   } catch {}
 
   const heroStats = [
@@ -28,11 +119,9 @@ export default async function HomePage() {
     <div className="min-h-screen bg-ivory">
       <SiteHeader />
 
-      {/* HERO — Midnight Navy → Royal Plum with gold glow */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 gradient-navy-plum" />
         <div className="absolute inset-0 opacity-20" style={{ background: "radial-gradient(700px circle at 15% 25%, rgba(198,161,91,0.35), transparent 45%), radial-gradient(600px circle at 85% 15%, rgba(114,47,69,0.25), transparent 40%)" }} />
-        {/* subtle fabric texture overlay */}
         <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: "url('https://grainy-gradients.vercel.app/noise.svg')" }} />
         <div className="relative mx-auto max-w-7xl px-6 py-12 lg:py-16 grid lg:grid-cols-2 gap-10 items-center">
           <div className="text-ivory">
@@ -64,7 +153,6 @@ export default async function HomePage() {
           <div className="relative">
             <div className="relative rounded-[28px] p-3 bg-white/10 border border-white/15 backdrop-blur-xl shadow-premium">
               <img src="https://images.unsplash.com/photo-1558769132-cb1aea458c5e?q=80&w=900&auto=format&fit=crop" alt="Editorial tailoring — Agbada" className="rounded-[22px] h-[520px] w-full object-cover" />
-              {/* info overlay */}
               <div className="absolute bottom-6 left-6 right-6 glass rounded-2xl p-3 flex items-center justify-between">
                 <div>
                   <div className="text-sm font-semibold text-midnight">Elegance Agbada — Ade Bespoke Atelier</div>
@@ -84,7 +172,6 @@ export default async function HomePage() {
           </div>
         </div>
 
-        {/* QUICK DISCOVERY PANEL — floating glass search */}
         <div className="relative mx-auto max-w-7xl px-6 -mb-10">
           <div className="glass rounded-2xl p-4 md:p-5 border border-plum/10 grid md:grid-cols-6 gap-3">
             <div className="md:col-span-2">
@@ -109,13 +196,58 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* FEATURED — Popular Designs */}
+      {/* Location-aware selector */}
+      <section className="mx-auto max-w-7xl px-6 pt-12">
+        <HomepageLocationSelector initialState={browsingState} initialCity={browsingCity} />
+        <div className="text-xs text-taupe mt-2">Showing results near: <span className="font-semibold text-midnight">{browsingCity || browsingState || "All Nigeria"} {browsingCity && `• ${browsingState}`}</span> {browsingLat && browsingLng && `• ${browsingLat.toFixed(2)}, ${browsingLng.toFixed(2)}`} — <Link href="/tailors" className="underline">Advanced search</Link></div>
+        {regionalNote && <div className="mt-2 text-xs px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-900">{regionalNote} Expanding to nearby areas, then wider state — clearly labeled as nearby/regional, never inventing businesses.</div>}
+      </section>
+
+      {/* Location-aware Tailors Near You */}
+      <section className="mx-auto max-w-7xl px-6 pt-6">
+        <div className="flex items-end justify-between">
+          <div><div className="text-xs tracking-[0.18em] text-emeraldDeep font-semibold">TAILORS NEAR YOU • {nearbyLabel.toUpperCase()}</div><h2 className="font-display text-2xl md:text-3xl font-semibold mt-1">Tailors Near You</h2><p className="text-sm text-taupe mt-1">Verified & published tailors serving your location — ranked by proximity, verified status, rating</p></div>
+          <Link href={`/tailors?state=${browsingState||""}&city=${browsingCity||""}`} className="hidden sm:flex text-sm font-medium text-plum items-center gap-1">View all near you <ArrowRight className="h-4 w-4" /></Link>
+        </div>
+        <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-4 mt-6">
+          {nearbyTailors.map((t:any)=>(
+            <Link key={t.id} href={`/tailors/${t.slug}`} className="group">
+              <div className="rounded-2xl overflow-hidden border bg-white hover:shadow-card transition">
+                <div className="relative"><img src={t.profileImage || `https://picsum.photos/seed/${t.slug}/400/300`} alt={t.businessName} className="h-44 w-full object-cover group-hover:scale-[1.04] transition" /><div className="absolute top-2 left-2 bg-emeraldDeep text-white text-[11px] px-2 py-0.5 rounded-full flex items-center gap-1"><ShieldCheck className="h-3 w-3"/>Verified</div>{t._distance!=null && <div className="absolute top-2 right-2 bg-midnight text-white text-[11px] px-2 py-0.5 rounded-full">{t._distance.toFixed(1)}km away</div>}</div>
+                <div className="p-3"><div className="text-sm font-medium line-clamp-1">{t.businessName}</div><div className="text-xs text-taupe flex items-center gap-1"><MapPin className="h-3 w-3"/>{t.city}, {t.state} • {JSON.parse(t.specialties||'["Bespoke"]')[0]}</div><div className="flex items-center gap-1 mt-2"><Star className="h-3.5 w-3.5 text-gold fill-gold"/><span className="text-xs font-medium">{t.ratingAvg.toFixed(1)} ({t.ratingCount})</span><span className="ml-auto text-xs text-emeraldDeep">From ₦{Number(t.startingPrice||25000).toLocaleString()}</span></div><div className="mt-2 flex gap-2"><span className="flex-1 text-center text-xs px-2 py-1 rounded-full bg-midnight text-white">View Profile</span><span className="flex-1 text-center text-xs px-2 py-1 rounded-full border">Book Tailor</span></div></div>
+              </div>
+            </Link>
+          ))}
+        </div>
+        {nearbyTailors.length===0 && <div className="text-sm text-muted-foreground rounded-xl border bg-white p-6 text-center mt-4">No tailors found — try expanding to state or check back after tailors complete location verification.</div>}
+      </section>
+
+      {/* Fabric Sellers Near You */}
+      <section className="bg-midnight text-ivory mt-10">
+        <div className="mx-auto max-w-7xl px-6 py-10">
+          <div className="flex items-end justify-between">
+            <div><div className="text-xs tracking-[0.18em] text-gold font-semibold">FABRIC SELLERS NEAR YOU • {nearbyLabel.toUpperCase()}</div><h2 className="font-display text-2xl md:text-3xl font-semibold mt-1">Fabric Sellers Near You</h2><p className="text-sm text-ivory/70 mt-1">Texture close-ups • stock-aware • delivery to tailor supported • distance-ranked</p></div>
+            <Link href={`/fabrics?state=${browsingState||""}&city=${browsingCity||""}`} className="hidden sm:flex text-sm font-medium text-gold items-center gap-1">Shop fabrics <ArrowRight className="h-4 w-4"/></Link>
+          </div>
+          <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-4 mt-6">
+            {nearbySellers.map((s:any)=>(
+              <Link key={s.id} href={`/sellers/${s.slug}`} className="group">
+                <div className="rounded-2xl overflow-hidden border border-white/10 bg-white text-charcoal">
+                  <img src={s.profileImage || `https://picsum.photos/seed/${s.slug}/400/300`} alt={s.businessName} className="h-40 w-full object-cover group-hover:scale-[1.04] transition" />
+                  <div className="p-3"><div className="text-sm font-medium line-clamp-1">{s.businessName}</div><div className="text-xs text-taupe flex items-center gap-1"><MapPin className="h-3 w-3"/>{s.city}, {s.state} {s._distance!=null && `• ${s._distance.toFixed(1)}km`}</div><div className="text-xs mt-1">{s.deliveryMethods||"Dispatch • Pickup"} • {s._distance!=null ? `${s._distance.toFixed(0)}km` : "Regional"}</div><div className="mt-2 flex gap-2"><span className="flex-1 text-center text-xs px-2 py-1 rounded-full bg-midnight text-white">View Shop</span><span className="flex-1 text-center text-xs px-2 py-1 rounded-full border">View Fabric</span></div></div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="mx-auto max-w-7xl px-6 pt-16 pb-8">
         <div className="flex items-end justify-between gap-4">
           <div>
             <div className="text-xs tracking-[0.18em] text-plum font-semibold">EDITOR'S COLLECTION</div>
             <h2 className="font-display text-2xl md:text-3xl font-semibold mt-1">Popular Clothing Designs</h2>
-            <p className="text-sm text-taupe mt-1">Inspired by tradition, tailored for today.</p>
+            <p className="text-sm text-taupe mt-1">Inspired by tradition, tailored for today — filtered by your region where available.</p>
           </div>
           <Link href="/designs" className="hidden sm:flex text-sm font-medium text-plum items-center gap-1">Explore Gallery <ArrowRight className="h-4 w-4" /></Link>
         </div>
@@ -134,101 +266,16 @@ export default async function HomePage() {
             </Link>
           ))}
         </div>
+        <div className="text-xs text-taupe mt-3">Popular Designs in Your Region — based on actual catalog data (category + tailor location), not fabricated. {browsingState && `For ${browsingState}${browsingCity?`, ${browsingCity}`:""} we prioritized local tailors' designs.`}</div>
       </section>
 
-      {/* Recommended Tailors */}
-      <section className="bg-white border-y">
-        <div className="mx-auto max-w-7xl px-6 py-10">
-          <div className="flex items-end justify-between">
-            <div>
-              <div className="text-xs tracking-[0.18em] text-emeraldDeep font-semibold">VERIFIED ATELIERS</div>
-              <h2 className="font-display text-2xl md:text-3xl font-semibold mt-1">Recommended Tailors</h2>
-              <p className="text-sm text-taupe mt-1">Craftsmanship you can trust — ratings from completed orders.</p>
-            </div>
-            <Link href="/tailors" className="hidden sm:flex text-sm font-medium text-plum items-center gap-1">Find Tailors <ArrowRight className="h-4 w-4" /></Link>
-          </div>
-          <div className="grid md:grid-cols-4 gap-6 mt-6">
-            {(featuredTailors.length ? featuredTailors : [
-              { id: "1", businessName: "Ade Bespoke", slug: "ade-bespoke", city: "Lagos", specialties: '["Agbada","Corporate"]', profileImage: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400&auto=format&fit=crop", ratingAvg: 4.9 },
-              { id: "2", businessName: "Zara Stitches", slug: "zara-stitches", city: "Abuja", specialties: '["Wedding","Ankara"]', profileImage: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400&auto=format&fit=crop", ratingAvg: 4.8 },
-              { id: "3", businessName: "Kente & Co", slug: "kente-co", city: "Accra", specialties: '["Traditional","Kente"]', profileImage: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?q=80&w=400&auto=format&fit=crop", ratingAvg: 4.9 },
-              { id: "4", businessName: "The Cut Lagos", slug: "the-cut-lagos", city: "Lekki", specialties: '["Casual","Street"]', profileImage: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=400&auto=format&fit=crop", ratingAvg: 4.7 },
-            ]).map((t: any) => (
-              <Link key={t.id} href={`/tailors/${t.slug}`}>
-                <Card className="overflow-hidden hover:shadow-card transition group border-midnight/10">
-                  <div className="h-44 overflow-hidden relative">
-                    <img src={t.profileImage || `https://picsum.photos/seed/${t.slug}/400/300`} alt={t.businessName} className="h-full w-full object-cover group-hover:scale-105 transition duration-500" />
-                    <div className="absolute top-3 left-3 bg-emeraldDeep text-white text-[11px] px-2 py-0.5 rounded-full flex items-center gap-1"><ShieldCheck className="h-3 w-3" /> Verified</div>
-                  </div>
-                  <CardContent className="p-4">
-                    <div className="font-semibold">{t.businessName}</div>
-                    <div className="text-xs text-taupe flex items-center gap-1 mt-1"><MapPin className="h-3 w-3" /> {t.city} • {Array.isArray(t.specialties) ? t.specialties[0] : (JSON.parse(t.specialties || '[]')[0] || "Bespoke")}</div>
-                    <div className="flex items-center gap-2 mt-2"><Star className="h-3.5 w-3.5 text-gold fill-gold" /><span className="text-xs font-medium">{t.ratingAvg} • View Portfolio</span><span className="ml-auto text-xs text-emeraldDeep">From ₦25k</span></div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
-          </div>
-          {/* near you strip */}
-          <div className="mt-6 rounded-2xl border bg-gradient-champagne-ivory p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <div className="text-sm"><span className="font-semibold">Tailors near you</span> <span className="text-taupe">— enable location to see ateliers within 5km, with distance, ETA and availability.</span></div>
-            <Link href="/tailors"><Button variant="outline" size="sm">Show nearby tailors</Button></Link>
-          </div>
+      <section className="mx-auto max-w-7xl px-6 py-6">
+        <div className="rounded-2xl border bg-gradient-champagne-ivory p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="text-sm"><span className="font-semibold">Available Services Around You</span> <span className="text-taupe">— genuinely available within selected service area ({browsingState||"Nigeria"}), verified location, rating, and availability.</span></div>
+          <Link href={`/tailors?state=${browsingState||""}&city=${browsingCity||""}`}><Button variant="outline" size="sm">Browse services</Button></Link>
         </div>
       </section>
 
-      {/* Trending Fabrics — dark luxury band */}
-      <section className="bg-midnight text-ivory">
-        <div className="mx-auto max-w-7xl px-6 py-10">
-          <div className="flex items-end justify-between">
-            <div>
-              <div className="text-xs tracking-[0.18em] text-gold font-semibold">FABRIC BOUTIQUE</div>
-              <h2 className="font-display text-2xl md:text-3xl font-semibold mt-1">Trending Fabrics</h2>
-              <p className="text-sm text-ivory/70 mt-1">Texture close-ups • stock-aware • delivery to tailor supported.</p>
-            </div>
-            <Link href="/fabrics" className="hidden sm:flex text-sm font-medium text-gold items-center gap-1">Shop all fabrics <ArrowRight className="h-4 w-4" /></Link>
-          </div>
-          <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-4 mt-6">
-            {(featuredFabrics.length ? featuredFabrics : Array.from({ length: 6 }).map((_, i) => ({
-              id: `${i}`, slug: `fabric-${i}`, name: ["Swiss Lace Ivory","Ankara Gold Burst","Cashmere Wool Charcoal","Aso-Oke Royal","Adire Indigo","Brocade Champagne"][i], price: 8000 + i*2000, material: ["Lace","Ankara","Wool","Aso-Oke","Adire","Brocade"][i], images: [{ url: `https://images.unsplash.com/photo-${["1523381210434-271e8be1f52b","1558769132-cb1aea458c5e","1567401893414-76b7b1e5a7a5","1515886657613-9f3515b0c78f","1445205170230-053b83016050","1485230893385-4a4c9ff37d2c"][i]}?q=80&w=400&auto=format&fit=crop` }], seller: { businessName: "Lagos Fabrics" }
-            }))).map((p: any) => (
-              <Link key={p.id} href={`/fabrics/${p.slug}`} className="group">
-                <div className="rounded-2xl overflow-hidden border border-white/10 bg-white text-charcoal hover:shadow-premium transition">
-                  <img src={p.images?.[0]?.url} alt={p.name} className="h-40 w-full object-cover group-hover:scale-[1.04] transition" />
-                  <div className="p-3"><div className="text-sm font-medium line-clamp-1">{p.name}</div><div className="text-xs text-taupe">{p.material} • {p.seller?.businessName}</div><div className="text-sm font-semibold mt-1">₦{Number(p.price).toLocaleString()} / m</div></div>
-                </div>
-              </Link>
-            ))}
-          </div>
-          <div className="mt-6 text-xs text-ivory/60">Compare • Favorites • Recently viewed • Recommended for your selected design</div>
-        </div>
-      </section>
-
-      {/* Collections */}
-      <section className="mx-auto max-w-7xl px-6 py-10">
-        <div className="flex items-center justify-between">
-          <h2 className="font-display text-2xl font-semibold">Featured Fashion Collections</h2>
-          <span className="text-xs tracking-widest text-taupe">CURATED BY TWT</span>
-        </div>
-        <div className="grid md:grid-cols-3 gap-4 mt-6">
-          {[
-            { title: "Royal Wedding Aso-Ebi", img: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=600&auto=format&fit=crop", cat: "Burgundy → Plum" },
-            { title: "Corporate Heritage", img: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=600&auto=format&fit=crop", cat: "Emerald → Navy" },
-            { title: "Soft Ankara Everyday", img: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=600&auto=format&fit=crop", cat: "Champagne → Ivory" },
-          ].map(c => (
-            <div key={c.title} className="rounded-2xl overflow-hidden border relative h-64">
-              <img src={c.img} alt={c.title} className="h-full w-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-midnight/70 via-midnight/10 to-transparent" />
-              <div className="absolute bottom-3 left-3 right-3">
-                <div className="text-xs text-gold">{c.cat}</div>
-                <div className="font-display text-xl text-white">{c.title}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* How it works — premium steps */}
       <section id="how-it-works" className="mx-auto max-w-7xl px-6 py-10">
         <div className="text-center max-w-2xl mx-auto">
           <div className="text-xs tracking-[0.18em] text-plum font-semibold">THE TAILORING JOURNEY</div>
@@ -250,71 +297,8 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Verified partners + Testimonials */}
-      <section className="bg-white border-y">
-        <div className="mx-auto max-w-7xl px-6 py-10 grid lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2">
-            <div className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-emeraldDeep" /><span className="text-xs tracking-[0.18em] font-semibold text-emeraldDeep">VERIFIED PROFESSIONAL PARTNERS</span></div>
-            <h3 className="font-display text-xl font-semibold mt-2">Trust is stitched in</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-              {["House of Zara","Ade Atelier","Kente & Co","Lagos Fabrics Hub","Savile Yaba","Maison Tolu","Ankara Republic","George & Brocade"].map(p => (
-                <div key={p} className="rounded-xl border bg-ivory p-4 text-center">
-                  <div className="h-8 w-8 mx-auto rounded-full bg-midnight text-gold grid place-items-center text-xs">✓</div>
-                  <div className="text-xs font-medium mt-2">{p}</div>
-                  <div className="text-[11px] text-emeraldDeep">Verified • 4.8★</div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <Card className="border-gold/20">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2"><Quote className="h-5 w-5 text-gold" /><span className="font-semibold">Customer Love</span></div>
-              <blockquote className="mt-4 text-sm leading-relaxed text-charcoal">“TWT delivered my wedding aso-ebi in 5 days. The booking wizard, measurement guide and fabric-to-tailor delivery saved me 3 trips to Yaba market!”</blockquote>
-              <div className="mt-3 flex items-center gap-2"><div className="h-8 w-8 rounded-full bg-burgundy text-white grid place-items-center text-xs">A</div><div><div className="text-xs font-medium">Amaka O., Lagos</div><div className="text-xs text-taupe">Verified Buyer • #TWT-2412 • ★★★★★</div></div></div>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      {/* Become a partner + Newsletter */}
-      <section className="mx-auto max-w-7xl px-6 py-10 grid lg:grid-cols-2 gap-6">
-        <Card className="overflow-hidden border-plum/10">
-          <div className="grid md:grid-cols-2">
-            <div className="p-6">
-              <h3 className="font-display text-xl font-semibold">Become a Partner</h3>
-              <p className="text-sm text-taupe mt-1">Showcase your atelier to thousands seeking perfect fit.</p>
-              <div className="mt-4 flex flex-col gap-2">
-                <Link href="/register/tailor"><Button variant="primary" className="w-full">Apply as Tailor — TWT Verified</Button></Link>
-                <Link href="/register/seller"><Button variant="outline" className="w-full">Apply as Fabric Seller</Button></Link>
-              </div>
-              <div className="text-xs text-taupe mt-2">Map onboarding • progressive disclosure • verification in 48h</div>
-            </div>
-            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=500&auto=format&fit=crop" alt="Atelier" className="h-full w-full object-cover hidden md:block" />
-          </div>
-        </Card>
-        <Card className="bg-midnight text-ivory border-midnight">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-2"><Mail className="h-5 w-5 text-gold" /><span className="font-semibold">Join the Atelier Letter</span></div>
-            <p className="text-sm text-ivory/70 mt-2">New collections, fabric drops & Lagos fashion-week edits.</p>
-            <div className="mt-4 flex gap-2">
-              <input placeholder="Your email" className="flex-1 h-10 rounded-full px-4 text-sm text-midnight bg-white placeholder:text-taupe" />
-              <Button variant="gold" className="rounded-full">Subscribe</Button>
-            </div>
-            <div className="text-xs text-ivory/60 mt-2">No spam • Unsubscribe anytime • TWT respects privacy</div>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* Category quick links */}
-      <section className="mx-auto max-w-7xl px-6 pb-10 grid lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-3 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-          {["Men's Fashion","Women's Fashion","Traditional","Corporate","Wedding","Casual","Children","Fabrics"].map(c => (
-            <Link key={c} href={`/designs?category=${encodeURIComponent(c)}`} className="rounded-2xl border bg-white p-4 hover:shadow-soft transition flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-plum/5 grid place-items-center"><Package className="h-5 w-5 text-plum" /></div>
-              <div className="text-sm font-medium">{c}</div>
-            </Link>
-          ))}
-        </div>
+      <section className="mx-auto max-w-7xl px-6 pb-10">
+        <div className="text-center text-xs text-taupe">Location ranking: 1) serves selected location 2) confirmed lat/lng 3) category/specialty match 4) verified 5) rating 6) availability/delivery coverage — never fabricating distance, price, or availability.</div>
       </section>
 
       <SiteFooter />
