@@ -25,7 +25,7 @@ async function getRedirectForEmail(email: string) {
   return "/"; // fallback; Auth will still set session
 }
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; callbackUrl?: string }> }) {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; callbackUrl?: string; registered?: string; email?: string }> }) {
   const sp = await searchParams;
   const demoMode = process.env.DEMO_MODE !== "false";
 
@@ -35,19 +35,15 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     const password = String(formData.get("password") || "");
     if (!email || !password) redirect("/login?error=MissingFields");
 
-    // Pre-resolve role to choose correct post-login destination (trusted DB, not client)
     const redirectTo = await getRedirectForEmail(email);
 
     try {
-      // Auth.js v5 server action — handles bcrypt + session, no CSRF token needed
       await signIn("credentials", { email, password, redirectTo });
     } catch (error) {
-      // Next.js redirect throws — must be re-thrown
       if (error && typeof error === "object" && "digest" in error && String((error as any).digest).includes("NEXT_REDIRECT")) {
         throw error;
       }
       if (error instanceof AuthError) {
-        // CredentialsSignin, etc.
         redirect("/login?error=CredentialsSignin");
       }
       redirect("/login?error=CredentialsSignin");
@@ -70,12 +66,20 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   }
 
   const errorMap: Record<string, string> = {
-    CredentialsSignin: "Invalid email or password. Try demo accounts below.",
+    CredentialsSignin: "Invalid email or password. Check your spelling and try again, or use a demo account below.",
     MissingCSRF: "Session expired — please try again.",
     MissingFields: "Please fill in both email and password.",
     DemoDisabled: "Demo mode is disabled on this environment.",
     DemoNotAllowed: "That demo account is not allowed.",
     DemoFailed: "Demo sign-in failed — ensure seed data is present (npm run db:seed).",
+    EmailExists: "That email is already registered. Please sign in instead — one email = one account.",
+  };
+
+  const isSuccess = !!sp?.registered;
+  const successMap: Record<string,string> = {
+    customer: "Customer account created — please sign in with your new email and password.",
+    tailor: "Tailor application submitted — you can sign in now. Your shop is PENDING until admin verification.",
+    seller: "Seller account created — please sign in. Your inventory is PENDING approval.",
   };
 
   return (
@@ -90,16 +94,27 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             </CardHeader>
             <CardContent>
               {sp?.error && (
-                <div className="mb-4 rounded-xl bg-burgundy/10 text-burgundy border border-burgundy/20 px-3 py-2 text-sm">
-                  {errorMap[sp.error] || "Sign-in failed. Please try again."}{" "}
-                  <span className="text-xs opacity-80">({sp.error})</span>
+                <div className={`mb-4 rounded-xl border px-3 py-3 text-sm ${sp.error === "EmailExists" ? "bg-amber-50 border-amber-300 text-amber-900" : "bg-burgundy/10 text-burgundy border-burgundy/20"}`}>
+                  <div className="font-semibold">{sp.error === "EmailExists" ? "⚠ That email is already in use" : "Sign-in failed"}</div>
+                  <div className="mt-1 text-xs leading-relaxed">{errorMap[sp.error] || "Sign-in failed. Please try again."}</div>
+                  {sp.error === "EmailExists" && sp.email && <div className="mt-1 text-xs opacity-80">Email: {sp.email}</div>}
+                  <div className="mt-2 flex gap-3 text-xs">
+                    <span className="opacity-60">({sp.error})</span>
+                    {sp.error === "EmailExists" && <><Link href="/forgot-password" className="underline">Reset password</Link><Link href="/register" className="underline">Use different email</Link></>}
+                  </div>
+                </div>
+              )}
+              {isSuccess && (
+                <div className="mb-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 px-3 py-3 text-sm">
+                  <div className="font-semibold">✓ {successMap[sp.registered!] || "Account created — please sign in."}</div>
+                  {sp.email && <div className="text-xs mt-1 opacity-80">Account: {sp.email}</div>}
                 </div>
               )}
 
               <form action={loginAction} className="space-y-4">
                 <div>
                   <Label htmlFor="email">Email</Label>
-                  <Input id="email" name="email" type="email" placeholder="you@example.com" required defaultValue="customer@demo.twt.ng" />
+                  <Input id="email" name="email" type="email" placeholder="you@example.com" required defaultValue={sp?.email || "customer@demo.twt.ng"} />
                 </div>
                 <div>
                   <Label htmlFor="password">Password</Label>
