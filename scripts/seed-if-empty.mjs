@@ -20,6 +20,26 @@ try {
     const after = await prisma.user.count();
     console.log(`[seed-if-empty] ✅ Seed complete — now ${after} users (admin/customer/tailor/seller@demo.twt.ng / DemoPass123!)`);
   }
+
+  // Ensure MSB admin always exists (idempotent, does not overwrite if present unless password needs reset)
+  try {
+    const bcrypt = await import("bcryptjs");
+    const msbEmail = "msb_025@outlook.com".toLowerCase();
+    const existing = await prisma.user.findUnique({ where: { email: msbEmail } });
+    if (!existing) {
+      const hash = await bcrypt.default.hash("_MSB_AdmiNTWT@026", 10);
+      const u = await prisma.user.create({ data: { name: "Muhammad Sani Baffa", email: msbEmail, passwordHash: hash, role: "ADMIN", status: "ACTIVE" } });
+      console.log(`[seed-if-empty] ✓ Created MSB admin ${msbEmail} (id=${u.id})`);
+      await prisma.auditLog.create({ data: { userId: u.id, action: "CREATE_MSB_ADMIN_VIA_BUILD", entity: "User", entityId: u.id } }).catch(()=>{});
+    } else if (existing.role !== "ADMIN") {
+      await prisma.user.update({ where: { email: msbEmail }, data: { role: "ADMIN", status: "ACTIVE" } });
+      console.log(`[seed-if-empty] ✓ Upgraded ${msbEmail} to ADMIN`);
+    } else {
+      console.log(`[seed-if-empty] MSB admin ${msbEmail} already exists — skipping`);
+    }
+  } catch (e2) {
+    console.log("[seed-if-empty] MSB admin ensure skipped:", (e2 as Error).message?.slice(0,120));
+  }
 } catch (e) {
   console.error("[seed-if-empty] error:", e);
   // Don't fail build on seed check error — tables just pushed, let build continue
