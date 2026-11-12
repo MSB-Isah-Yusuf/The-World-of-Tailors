@@ -2,18 +2,27 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as React from "react";
-import { LayoutDashboard, ClipboardList, Ruler, ShoppingBag, MapPin, Heart, Star, Sun, Moon, Globe } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Ruler, ShoppingBag, MapPin, Heart, Star, Sun, Moon, Globe, Search, Palette, Store, FileText, ShoppingCart, MessageCircle, Truck, Bell, Settings, Lock } from "lucide-react";
 import { useThemeToggle } from "@/lib/theme";
 import { useLanguage } from "@/lib/i18n";
 
 const NAV = [
   { href: "/dashboard/customer", label:"Overview", icon: LayoutDashboard },
+  { href: "/dashboard/customer/discover", label:"Discover Tailors", icon: Search },
+  { href: "/dashboard/customer/designs", label:"Browse Designs", icon: Palette },
+  { href: "/dashboard/customer/marketplace", label:"Fabric Marketplace", icon: Store },
   { href: "/dashboard/customer/bookings", label:"My Bookings", icon: ClipboardList },
   { href: "/dashboard/customer/measurements", label:"Measurements", icon: Ruler },
   { href: "/dashboard/customer/orders", label:"Fabric Orders", icon: ShoppingBag },
-  { href: "/dashboard/customer/addresses", label:"Addresses", icon: MapPin },
+  { href: "/dashboard/customer/cart", label:"Shopping Cart", icon: ShoppingCart },
   { href: "/dashboard/customer/favorites", label:"Favorites", icon: Heart },
+  { href: "/dashboard/customer/messages", label:"Messages", icon: MessageCircle },
+  { href: "/dashboard/customer/deliveries", label:"Delivery Tracking", icon: Truck },
   { href: "/dashboard/customer/reviews", label:"Reviews", icon: Star },
+  { href: "/dashboard/customer/addresses", label:"Addresses", icon: MapPin },
+  { href: "/dashboard/customer/notifications", label:"Notifications", icon: Bell },
+  { href: "/dashboard/customer/account", label:"Account Settings", icon: Settings },
+  { href: "/dashboard/customer/privacy", label:"Privacy & Security", icon: Lock },
 ];
 
 export function AdvancedCustomerShell({ title, children }: { title:string; children: React.ReactNode }) {
