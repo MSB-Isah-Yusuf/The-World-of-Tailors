@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as React from "react";
-import { LayoutDashboard, ClipboardList, Users, Ruler, FileStack, Factory, CheckCircle2, CalendarDays, MessageCircle, Star, Wallet, Building2, MapPin, Settings, Sun, Moon, Globe } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Users, Ruler, FileStack, Factory, CheckCircle2, CalendarDays, MessageCircle, Star, Wallet, Building2, MapPin, Settings, Sun, Moon, Globe, ShieldCheck, PackageCheck, Bell } from "lucide-react";
 import { useThemeToggle } from "@/lib/theme";
 import { useLanguage } from "@/lib/i18n";
 
@@ -14,6 +14,7 @@ const NAV = [
   { href: "/dashboard/tailor/measurements/records", labelKey:"measurementRecords", icon: FileStack },
   { href: "/dashboard/tailor/designs", labelKey:"designs", icon: Factory },
   { href: "/dashboard/tailor/production", labelKey:"production", icon: Factory },
+  { href: "/dashboard/tailor/ready", labelKey:"readyForCollection", icon: PackageCheck },
   { href: "/dashboard/tailor/completed", labelKey:"completed", icon: CheckCircle2 },
   { href: "/dashboard/tailor/calendar", labelKey:"calendar", icon: CalendarDays },
   { href: "/dashboard/tailor/messages", labelKey:"messages", icon: MessageCircle },
@@ -21,6 +22,8 @@ const NAV = [
   { href: "/dashboard/tailor/earnings", labelKey:"earnings", icon: Wallet },
   { href: "/dashboard/tailor/profile", labelKey:"businessProfile", icon: Building2 },
   { href: "/dashboard/tailor/location", labelKey:"locationSettings", icon: MapPin },
+  { href: "/dashboard/tailor/verification", labelKey:"verificationStatus", icon: ShieldCheck },
+  { href: "/dashboard/tailor/notifications", labelKey:"notifications", icon: Bell },
   { href: "/dashboard/tailor/account", labelKey:"accountSettings", icon: Settings },
 ];
 
