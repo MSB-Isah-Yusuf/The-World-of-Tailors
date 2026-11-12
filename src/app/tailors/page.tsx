@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { MapPin, Star, ShieldCheck } from "lucide-react";
 import { distanceKm, NIGERIA_STATES } from "@/lib/location-data";
 
-export default async function TailorsPage({ searchParams }: { searchParams: Promise<{ q?: string; state?: string; city?: string; lat?:string; lng?:string; distance?:string; specialty?:string; rating?:string; price?:string; available?:string }> }) {
+export default async function TailorsPage({ searchParams }: { searchParams: Promise<{ q?: string; state?: string; city?: string; lat?:string; lng?:string; distance?:string; specialty?:string; rating?:string; price?:string; available?:string; page?:string }> }) {
   const sp = await searchParams;
   const state = sp?.state || "";
   const city = sp?.city || "";
@@ -21,6 +21,7 @@ export default async function TailorsPage({ searchParams }: { searchParams: Prom
   const lng = sp?.lng ? Number(sp.lng) : undefined;
   const availableOnly = sp?.available === "true";
 
+  const page = Math.max(1, Number(sp?.page || 1)); const take=12; let totalTailors=0;
   let tailors:any[]=[];
   try {
     const where:any={ isPublished:true, businessStatus:"APPROVED" };
@@ -60,6 +61,8 @@ export default async function TailorsPage({ searchParams }: { searchParams: Prom
         return 0;
       });
     }
+    totalTailors = tailors.length;
+    tailors = tailors.slice((page-1)*take, page*take);
   } catch {}
   if (tailors.length===0 && !q && !state) {
     tailors = [
@@ -106,7 +109,7 @@ export default async function TailorsPage({ searchParams }: { searchParams: Prom
             </Link>
           ))}
         </div>
-        <div className="mt-6 text-xs text-muted-foreground">Geographic search: country → state → city → LGA → coordinates + serviceRadiusKm • PostGIS-ready • Expands to nearby/regional when exact city empty, never inventing businesses.</div>
+        <div className="mt-6 flex justify-between items-center"><div className="text-xs text-muted-foreground">Page {page} • {tailors.length} of {totalTailors||tailors.length} • Geographic search: state→city→LGA→coordinates + serviceRadiusKm</div><div className="flex gap-2">{page>1 && <a href={`?page=${page-1}`} className="px-3 py-1 rounded-full border bg-white text-xs">Prev</a>}<a href={`?page=${page+1}`} className="px-3 py-1 rounded-full border bg-white text-xs">Next</a></div></div>
       </div>
       <SiteFooter />
     </div>

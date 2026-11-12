@@ -6,17 +6,19 @@ import { Input } from "@/components/ui/input";
 import { distanceKm, NIGERIA_STATES } from "@/lib/location-data";
 import { MapPin } from "lucide-react";
 
-export default async function FabricsPage({ searchParams }: { searchParams: Promise<{ q?:string; state?:string; city?:string; lat?:string; lng?:string; distance?:string; fabricType?:string; color?:string; price?:string; inStock?:string }> }) {
+export default async function FabricsPage({ searchParams }: { searchParams: Promise<{ q?:string; state?:string; city?:string; lat?:string; lng?:string; distance?:string; fabricType?:string; color?:string; price?:string; inStock?:string; page?:string }> }) {
   const sp = await searchParams;
   const state = sp?.state||""; const city= sp?.city||""; const q= (sp?.q||"").toLowerCase().trim(); const fabricType= sp?.fabricType||""; const color= sp?.color||""; const lat= sp?.lat? Number(sp.lat):undefined; const lng= sp?.lng? Number(sp.lng):undefined; const distance= sp?.distance? Number(sp.distance):0;
-  let products:any[]=[];
+  const page = Math.max(1, Number((await searchParams)?.page || 1)); const take=12; const skip=(page-1)*take;
+  let products:any[]=[]; let total=0;
   try {
     const where:any={ isPublished:true };
     if (q) where.OR=[{ name:{ contains:q, mode:"insensitive" } },{ material:{ contains:q, mode:"insensitive" } }];
     if (fabricType) where.material = { contains: fabricType, mode:"insensitive" };
     if (color) where.color = { contains: color, mode:"insensitive" };
     if (sp?.inStock==="true") where.stock = { gt:0 };
-    products = await prisma.fabricProduct.findMany({ where, include:{ images:true, seller:true, category:true }, take:50 });
+    total = await prisma.fabricProduct.count({ where }).catch(()=>0);
+    products = await prisma.fabricProduct.findMany({ where, include:{ images:true, seller:true, category:true }, orderBy:{ createdAt:"desc" }, skip, take });
     // Seller location filter + distance
     if (state || city || (lat!=null&&lng!=null)) {
       products = products.filter((p:any)=>{
@@ -66,7 +68,7 @@ export default async function FabricsPage({ searchParams }: { searchParams: Prom
             </Link>
           ))}
         </div>
-        <div className="mt-4 text-xs text-muted-foreground">Combine location + product filters • Active-filter chips + Reset • Stock-aware • Delivery to tailor supported • No fabrication of distance/availability</div>
+        <div className="mt-4 flex justify-between items-center"><div className="text-xs text-muted-foreground">Page {page} • {products.length} of {total||products.length} • Combine location + product filters • Stock-aware</div><div className="flex gap-2">{page>1 && <a href={`?page=${page-1}`} className="px-3 py-1 rounded-full border bg-white text-xs">Prev</a>}<a href={`?page=${page+1}`} className="px-3 py-1 rounded-full border bg-white text-xs">Next</a></div></div>
       </div><SiteFooter /></div>
   );
 }
