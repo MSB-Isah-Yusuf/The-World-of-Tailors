@@ -1,8 +1,10 @@
 "use client";
 import Link from "next/link";
 import { Button } from "./ui/button";
-import { Search, ShoppingBag, Heart, Menu, ChevronDown } from "lucide-react";
+import { Search, Heart, Menu, ChevronDown } from "lucide-react";
 import { useState } from "react";
+import { CartBadge } from "./cart/CartBadge";
+import { NotificationBell } from "./notifications/NotificationBell";
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
@@ -38,9 +40,10 @@ export function SiteHeader() {
             </nav>
 
             <div className="flex items-center gap-2">
-              <button onClick={()=>setSearchOpen(!searchOpen)} className="h-9 w-9 grid place-items-center rounded-full border bg-white hover:shadow-soft"><Search className="h-4 w-4 text-midnight" /></button>
-              <Link href="/dashboard/customer/favorites" className="hidden sm:grid h-9 w-9 place-items-center rounded-full border bg-white"><Heart className="h-4 w-4 text-midnight" /></Link>
-              <Link href="/checkout" className="hidden sm:grid h-9 w-9 place-items-center rounded-full border bg-white relative"><ShoppingBag className="h-4 w-4 text-midnight" /><span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-burgundy text-white text-[10px] grid place-items-center">2</span></Link>
+              <button onClick={()=>setSearchOpen(!searchOpen)} className="h-9 w-9 grid place-items-center rounded-full border bg-white hover:shadow-soft" aria-label="Search"><Search className="h-4 w-4 text-midnight" /></button>
+              <Link href="/dashboard/customer/favorites" className="hidden sm:grid h-9 w-9 place-items-center rounded-full border bg-white" aria-label="Favorites"><Heart className="h-4 w-4 text-midnight" /></Link>
+              <CartBadge />
+              <NotificationBell />
               <Link href="/login" className="hidden sm:inline-flex"><Button variant="ghost" size="sm">Sign In</Button></Link>
               <Link href="/register" className="hidden sm:inline-flex"><Button variant="primary" size="sm">Get Started</Button></Link>
               <button onClick={()=>setOpen(!open)} className="lg:hidden h-9 w-9 grid place-items-center rounded-full border bg-white"><Menu className="h-4 w-4" /></button>

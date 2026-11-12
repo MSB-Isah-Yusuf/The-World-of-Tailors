@@ -5,8 +5,14 @@ import "./globals.css";
 // Using system font stack + editorial web-safe fallback maintains luxury typography without blocking builds
 
 export const metadata: Metadata = {
-  title: "The World of Tailors (TWT) — Tailoring & Fabric Marketplace",
-  description: "The World of Tailors (TWT) — Your Style. Your Fabric. Your Perfect Fit. Discover master tailors, bespoke designs & premium fabrics in one trusted marketplace.",
+  metadataBase: new URL(process.env.AUTH_URL || "https://twt.ng"),
+  title: { default: "The World of Tailors (TWT) — Tailoring & Fabric Marketplace", template: "%s — The World of Tailors" },
+  description: "The World of Tailors (TWT) — Your Style. Your Fabric. Your Perfect Fit. Discover verified tailors, bespoke designs & premium fabrics — Lagos-first, Paystack secure.",
+  keywords: ["tailors Lagos", "bespoke Nigeria", "fabric marketplace", "agbada", "kaftan", "aso-oke", "ankara"],
+  openGraph: { title: "The World of Tailors — TWT", description: "Verified tailors, designs & fabrics in one trusted marketplace", type: "website", locale: "en_NG" },
+  twitter: { card: "summary_large_image", title: "The World of Tailors", description: "Lagos-first tailoring marketplace" },
+  robots: { index: true, follow: true },
+  alternates: { canonical: "/" },
 };
 
 function ThemeScript(){
