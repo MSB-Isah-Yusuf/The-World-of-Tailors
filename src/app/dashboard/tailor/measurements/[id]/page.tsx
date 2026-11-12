@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/rbac";
 import { MannequinClient } from "@/components/mannequin/MannequinClient";
+import { MeasurementDetailActions } from "@/components/mannequin/MeasurementDetailActions";
 import Link from "next/link";
 
 export default async function MeasurementDetailPage({ params, searchParams }: { params: Promise<{ id:string }>; searchParams: Promise<{ edit?:string }> }) {
@@ -34,7 +35,7 @@ export default async function MeasurementDetailPage({ params, searchParams }: { 
         <MannequinClient profile={mp} isEdit={!!sp?.edit} />
         <Card><CardHeader><CardTitle className="text-sm">History & actions</CardTitle></CardHeader><CardContent className="text-xs text-muted-foreground">
           <div>History preserved via MeasurementHistory + booking snapshot (bookingId: {mp.bookingId||"—"}). Print sheet & export permitted; delete requires confirmation.</div>
-          <div className="mt-2 flex gap-2"><Link href={`/dashboard/tailor/measurements/${mp.id}?edit=1`}><Button size="sm" variant="outline" className="h-7 text-xs">Edit</Button></Link><a href="#" onClick={(e)=>e.preventDefault()} className="text-xs underline self-center">View history</a><a href="#" onClick={(e)=>{e.preventDefault(); window.print();}} className="text-xs underline self-center">Print sheet</a></div>
+          <MeasurementDetailActions id={mp.id} />
         </CardContent></Card>
       </div>
     </AdvancedTailorShell>
