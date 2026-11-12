@@ -9,7 +9,7 @@ const NAV = [
   { href: "/admin/tailors", label: "Tailor Management", icon: UserCheck },
   { href: "/admin/sellers", label: "Seller Management", icon: Store },
   { href: "/admin/verification", label: "Tailor Verification", icon: ShieldCheck },
-  { href: "/admin/sellers?status=PENDING", label: "Seller Verification", icon: ShieldCheck },
+  { href: "/admin/seller-verification", label: "Seller Verification", icon: ShieldCheck },
   { href: "/admin/designs", label: "Design Moderation", icon: Palette },
   { href: "/admin/fabrics", label: "Fabric Moderation", icon: Package },
   { href: "/admin/bookings", label: "Tailoring Bookings", icon: ClipboardList },
