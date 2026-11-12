@@ -2,21 +2,28 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as React from "react";
-import { LayoutDashboard, ShoppingBag, Package, Boxes, Users, Star, Wallet, Building2, MapPin, Settings, Sun, Moon, Globe, Truck } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, Package, Boxes, Users, Star, Wallet, Building2, MapPin, Settings, Sun, Moon, Globe, Truck, Tag, History, FileText, BarChart3, ShieldCheck, Bell, PlusCircle } from "lucide-react";
 import { useThemeToggle } from "@/lib/theme";
 import { useLanguage } from "@/lib/i18n";
 
 const NAV = [
   { href: "/dashboard/seller", label:"Overview", icon: LayoutDashboard },
-  { href: "/dashboard/seller/orders", label:"Fabric Orders", icon: ShoppingBag },
   { href: "/dashboard/seller/products", label:"My Products", icon: Package },
+  { href: "/dashboard/seller/products/new", label:"Add New Product", icon: PlusCircle },
+  { href: "/dashboard/seller/categories", label:"Categories", icon: Tag },
   { href: "/dashboard/seller/inventory", label:"Inventory", icon: Boxes },
+  { href: "/dashboard/seller/inventory/history", label:"Stock History", icon: History },
+  { href: "/dashboard/seller/orders", label:"Fabric Orders", icon: ShoppingBag },
   { href: "/dashboard/seller/customers", label:"Customers", icon: Users },
+  { href: "/dashboard/seller/deliveries", label:"Deliveries", icon: Truck },
   { href: "/dashboard/seller/reviews", label:"Reviews", icon: Star },
-  { href: "/dashboard/seller/earnings", label:"Earnings & Payouts", icon: Wallet },
+  { href: "/dashboard/seller/reports", label:"Sales Reports", icon: BarChart3 },
+  { href: "/dashboard/seller/earnings", label:"Earnings", icon: Wallet },
   { href: "/dashboard/seller/profile", label:"Business Profile", icon: Building2 },
   { href: "/dashboard/seller/location", label:"Location Settings", icon: MapPin },
-  { href: "/dashboard/seller/delivery", label:"Delivery Coverage", icon: Truck },
+  { href: "/dashboard/seller/delivery", label:"Delivery Coverage", icon: FileText },
+  { href: "/dashboard/seller/verification", label:"Verification", icon: ShieldCheck },
+  { href: "/dashboard/seller/notifications", label:"Notifications", icon: Bell },
   { href: "/dashboard/seller/account", label:"Account Settings", icon: Settings },
 ];
 
