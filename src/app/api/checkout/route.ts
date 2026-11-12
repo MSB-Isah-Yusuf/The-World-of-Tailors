@@ -62,35 +62,41 @@ export async function POST(req: NextRequest) {
     bySeller.get(sid)!.push(it);
   }
 
-  // Create orders transactionally per seller with atomic inventory reservation
+  // Create orders transactionally — GLOBAL atomic: all sellers succeed or all rollback
   const createdOrders: string[] = [];
   const orderRefs: string[] = [];
 
   try {
+    // Precompute refs/fees outside tx to avoid retry duplication
+    const planned: { sellerId:string; sellerItems:typeof rawItems; reference:string; subtotal:number; deliveryFee:number; total:number }[] = [];
     for (const [sellerId, sellerItems] of bySeller.entries()) {
       const reference = `FO-${new Date().getFullYear()}-${nanoid(8).toUpperCase()}`;
       const subtotal = sellerItems.reduce((s, it) => s + Number((productMap.get(it.productId) as any).price) * Number(it.quantity), 0);
-      const deliveryFee = 2500; // flat fee per seller order (MVP); TODO distance-based
-      const total = subtotal + deliveryFee;
+      const deliveryFee = 2500; // flat per seller (MVP); distance-based in Phase 5b
+      planned.push({ sellerId, sellerItems, reference, subtotal, deliveryFee, total: subtotal + deliveryFee });
+    }
 
-      await prisma.$transaction(async (tx) => {
-        // Reserve inventory atomically (optimistic check + update)
-        for (const it of sellerItems) {
-          const p: any = await tx.fabricProduct.findUnique({ where: { id: it.productId } });
-          if (!p) throw new Error(`Product ${it.productId} not found in tx`);
-          const available = Number(p.stock) - Number(p.reserved);
-          if (it.quantity > available) throw new Error(`${p.name} insufficient stock ${available} in tx`);
+    await prisma.$transaction(async (tx) => {
+      // 1) Reserve inventory atomically for ALL items first (fail fast)
+      for (const p of planned) {
+        for (const it of p.sellerItems) {
+          const prod: any = await tx.fabricProduct.findUnique({ where: { id: it.productId } });
+          if (!prod) throw new Error(`Product ${it.productId} not found in tx`);
+          const available = Number(prod.stock) - Number(prod.reserved);
+          if (it.quantity > available) throw new Error(`${prod.name} insufficient stock ${available} (requested ${it.quantity}) — another customer just bought it`);
           await tx.fabricProduct.update({ where: { id: it.productId }, data: { reserved: { increment: it.quantity } } });
-          await tx.inventoryMovement.create({ data: { productId: it.productId, delta: -it.quantity, reason: `RESERVE checkout ${reference}` } });
+          await tx.inventoryMovement.create({ data: { productId: it.productId, delta: -it.quantity, reason: `RESERVE checkout ${p.reference}` } });
         }
-
+      }
+      // 2) Create all orders + items + delivery + payment + notifications + audit inside same tx
+      for (const p of planned) {
         const order = await tx.fabricOrder.create({
           data: {
-            reference,
+            reference: p.reference,
             customerId: userId,
-            sellerId,
+            sellerId: p.sellerId,
             status: "PENDING",
-            subtotal, deliveryFee, total,
+            subtotal: p.subtotal, deliveryFee: p.deliveryFee, total: p.total,
             currency: "NGN",
             paymentStatus: "PENDING",
             deliveryType,
@@ -98,22 +104,20 @@ export async function POST(req: NextRequest) {
             tailorDestinationId,
           },
         });
-
-        for (const it of sellerItems) {
-          const p: any = productMap.get(it.productId);
+        for (const it of p.sellerItems) {
+          const prod: any = productMap.get(it.productId);
           await tx.fabricOrderItem.create({
             data: {
               orderId: order.id,
-              productId: p.id,
-              productName: p.name,
-              unit: p.unit,
-              priceSnapshot: p.price,
+              productId: prod.id,
+              productName: prod.name,
+              unit: prod.unit,
+              priceSnapshot: prod.price,
               quantity: it.quantity,
-              lineTotal: Number(p.price) * Number(it.quantity),
+              lineTotal: Number(prod.price) * Number(it.quantity),
             },
           });
         }
-
         await tx.delivery.create({
           data: {
             fabricOrderId: order.id,
@@ -123,29 +127,25 @@ export async function POST(req: NextRequest) {
             trackingCode: `TRK${nanoid(6).toUpperCase()}`,
           },
         });
-
         await tx.payment.create({
           data: {
-            reference: `PAY-${reference}`,
+            reference: `PAY-${p.reference}`,
             fabricOrderId: order.id,
-            amount: total,
+            amount: p.total,
             currency: "NGN",
             provider: "paystack",
             status: "PENDING",
           },
         });
-
-        // Notifications + audit inside tx
-        const sellerProfile: any = await tx.sellerProfile.findUnique({ where: { id: sellerId } });
+        const sellerProfile: any = await tx.sellerProfile.findUnique({ where: { id: p.sellerId } });
         if (sellerProfile?.userId) {
-          await tx.notification.create({ data: { userId: sellerProfile.userId, title: "New fabric order", message: `Order ${reference} — ₦${total.toLocaleString()} • ${deliveryType === "TO_TAILOR" ? "Deliver to tailor" : "Deliver to customer"}`, type: "order", link: "/dashboard/seller/orders" } });
+          await tx.notification.create({ data: { userId: sellerProfile.userId, title: "New fabric order", message: `Order ${p.reference} — ₦${p.total.toLocaleString()} • ${deliveryType === "TO_TAILOR" ? "Deliver to tailor" : "Deliver to customer"}`, type: "order", link: "/dashboard/seller/orders" } });
         }
-        await tx.auditLog.create({ data: { userId, action: "CREATE_FABRIC_ORDER", entity: "FabricOrder", entityId: order.id, metadata: { reference, sellerId, total } } });
-
+        await tx.auditLog.create({ data: { userId, action: "CREATE_FABRIC_ORDER", entity: "FabricOrder", entityId: order.id, metadata: { reference: p.reference, sellerId: p.sellerId, total: p.total } } });
         createdOrders.push(order.id);
-        orderRefs.push(reference);
-      });
-    }
+        orderRefs.push(p.reference);
+      }
+    }, { maxWait: 10000, timeout: 20000 });
 
     // Clear cart after success (only if we used cart)
     if (!overrideItems?.length) {
