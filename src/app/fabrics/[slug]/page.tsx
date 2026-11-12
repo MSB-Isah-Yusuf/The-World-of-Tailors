@@ -3,7 +3,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { AddToCart } from "./AddToCart";
 
 export default async function FabricDetail({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -20,10 +20,7 @@ export default async function FabricDetail({ params }: { params: Promise<{ slug:
           <div className="text-2xl font-semibold mt-4">₦{Number(product.price).toLocaleString()} / {product.unit}</div>
           <div className="text-xs text-muted-foreground">Min order: {product.minOrderQty} {product.unit} • {product.stock} available • Overselling prevented via DB transactions</div>
           <p className="text-sm mt-4 text-muted-foreground">{product.description}</p>
-          <form action="/api/cart" method="post" className="mt-6 flex gap-2">
-            <Input type="number" name="quantity" defaultValue={product.minOrderQty} min={product.minOrderQty} max={product.stock} className="w-24 bg-white" />
-            <Button type="submit" className="flex-1">Add to Cart</Button>
-          </form>
+          <AddToCart productId={product.id} minOrderQty={product.minOrderQty || 1} stock={product.stock} unit={product.unit} />
           <div className="text-xs text-muted-foreground mt-2">At checkout you can choose delivery to yourself or an eligible tailor. Separate seller fulfilment orders are created per cart.</div>
           <Link href="/checkout" className="block mt-3"><Button variant="outline" className="w-full">Go to Checkout</Button></Link>
         </div>
