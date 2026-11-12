@@ -15,11 +15,16 @@ if (!secret) {
   }
 }
 
+const SESSION_MAX_AGE_ADMIN = Number(process.env.SESSION_MAX_AGE_ADMIN || 8 * 60 * 60); // 8h absolute max for admin
+const SESSION_MAX_AGE_USER = Number(process.env.SESSION_MAX_AGE_USER || 12 * 60 * 60); // 12h absolute max for others
+const SESSION_IDLE_ADMIN = Number(process.env.SESSION_IDLE_ADMIN || 15 * 60); // 15m idle
+const SESSION_IDLE_USER = Number(process.env.SESSION_IDLE_USER || 30 * 60); // 30m idle
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   // Use explicit secret; fallback only for local dev to prevent build-time crash
   secret: secret || (process.env.NODE_ENV !== "production" ? "dev-fallback-secret-change-me-32chars!!" : undefined),
   adapter: PrismaAdapter(prisma) as any,
-  session: { strategy: "jwt", maxAge: 60 * 60 * 24 * 7 },
+  session: { strategy: "jwt", maxAge: SESSION_MAX_AGE_USER },
   providers: [
     Credentials({
       name: "credentials",
@@ -45,14 +50,26 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   callbacks: {
     async jwt({ token, user }) {
+      const now = Math.floor(Date.now()/1000);
       if (user) {
         (token as any).role = (user as any).role;
         (token as any).uid = (user as any).id;
+        (token as any).iat0 = now; // absolute max start
+        (token as any).lastActive = now;
       }
       if ((token as any).uid) {
         const dbUser = await prisma.user.findUnique({ where: { id: (token as any).uid } }) as any;
         if (!dbUser || dbUser.status === "SUSPENDED") return null as any;
         (token as any).role = dbUser.role;
+        // Enforce absolute max + idle timeout
+        const isAdmin = dbUser.role === "ADMIN";
+        const idle = isAdmin ? SESSION_IDLE_ADMIN : SESSION_IDLE_USER;
+        const max = isAdmin ? SESSION_MAX_AGE_ADMIN : SESSION_MAX_AGE_USER;
+        const iat0 = (token as any).iat0 || (token as any).iat || now;
+        const lastActive = (token as any).lastActive || now;
+        if (now - iat0 > max) return null as any; // absolute max exceeded
+        if (now - lastActive > idle) return null as any; // idle timeout
+        (token as any).lastActive = now;
       }
       return token;
     },
