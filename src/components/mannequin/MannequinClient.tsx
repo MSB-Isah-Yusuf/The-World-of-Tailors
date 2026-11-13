@@ -5,7 +5,7 @@ import { MannequinSVG, MEASUREMENT_HOTSPOTS } from "./Mannequin";
 type Props = { profile: { id:string; bodyTemplate:"MALE"|"FEMALE"; unit:string; status:string; garmentType:string; values: { key:string; value:number; unit:string }[] }; isEdit?:boolean };
 
 export function MannequinClient({ profile, isEdit }: Props){
-  const [selected, setSelected] = React.useState<string>(MEASUREMENT_HOTSPOTS[1]?.key || "shoulder");
+  const [selected, setSelected] = React.useState<string>(MEASUREMENT_HOTSPOTS[0]?.key || "shoulder");
   const [view, setView] = React.useState<"front"|"back">("front");
   const [unit, setUnit] = React.useState(profile.unit || "cm");
   const [values, setValues] = React.useState<Record<string,number|undefined>>(()=>{ const m:Record<string,number|undefined>={}; profile.values.forEach(v=> m[v.key]=v.value); return m; });
