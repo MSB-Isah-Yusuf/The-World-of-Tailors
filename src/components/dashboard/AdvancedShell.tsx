@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as React from "react";
-import { LayoutDashboard, ClipboardList, Users, Ruler, FileStack, Factory, CheckCircle2, CalendarDays, MessageCircle, Star, Wallet, Building2, MapPin, Settings, Sun, Moon, Globe, ShieldCheck, PackageCheck, Bell } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Users, Ruler, FileStack, Palette, Factory, CheckCircle2, CalendarDays, MessageCircle, Star, Wallet, Building2, MapPin, Settings, Sun, Moon, Globe, ShieldCheck, PackageCheck, Bell } from "lucide-react";
 import { useThemeToggle } from "@/lib/theme";
 import { useLanguage } from "@/lib/i18n";
 
@@ -12,7 +12,7 @@ const NAV = [
   { href: "/dashboard/tailor/customers", labelKey:"customers", icon: Users },
   { href: "/dashboard/tailor/measurements", labelKey:"measurements", icon: Ruler },
   { href: "/dashboard/tailor/measurements/records", labelKey:"measurementRecords", icon: FileStack },
-  { href: "/dashboard/tailor/designs", labelKey:"designs", icon: Factory },
+  { href: "/dashboard/tailor/designs", labelKey:"designs", icon: Palette },
   { href: "/dashboard/tailor/production", labelKey:"production", icon: Factory },
   { href: "/dashboard/tailor/ready", labelKey:"readyForCollection", icon: PackageCheck },
   { href: "/dashboard/tailor/completed", labelKey:"completed", icon: CheckCircle2 },
