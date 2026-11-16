@@ -85,17 +85,17 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
   };
 
   return (
-    <div className="min-h-screen bg-[#FFFBF0]"><SiteHeader />
+    <div className="min-h-screen bg-[#FFFBF0] dark:bg-midnight"><SiteHeader />
       <div className="mx-auto max-w-3xl px-6 py-8">
-        <Card>
-          <CardHeader><CardTitle>Request Tailoring — Full Measurements (Master List)</CardTitle><p className="text-sm text-muted-foreground">Tailor: {sp.tailor || "Select from portfolio"} • Design: {sp.design || "Bespoke"} • Complete list from master update — stored securely, only visible to chosen tailor. Priority: Shoulder → Neck → Arm → Chest/Bust → Shirt → Waist → Trouser</p></CardHeader>
+        <Card className="dark:bg-white/[0.05] dark:border-white/10">
+          <CardHeader><CardTitle className="dark:text-ivory">Request Tailoring — Full Measurements (Master List)</CardTitle><p className="text-sm text-muted-foreground dark:text-ivory/60">Tailor: {sp.tailor || "Select from portfolio"} • Design: {sp.design || "Bespoke"} • Complete list from master update — stored securely, only visible to chosen tailor. Priority: Shoulder → Neck → Arm → Chest/Bust → Shirt → Waist → Trouser</p></CardHeader>
           <CardContent>
             <form action={createBooking} className="space-y-6">
               <input type="hidden" name="tailorSlug" defaultValue={sp.tailor} />
               <input type="hidden" name="designSlug" defaultValue={sp.design} />
               
               <div className="space-y-3">
-                <div className="font-semibold text-sm flex justify-between">Upper body <span className="text-xs text-muted-foreground">{grouped.upper_body.length} fields</span></div>
+                <div className="font-semibold text-sm flex justify-between dark:text-ivory">Upper body <span className="text-xs text-muted-foreground dark:text-ivory/60">{grouped.upper_body.length} fields</span></div>
                 <div className="grid md:grid-cols-3 gap-3">
                   {grouped.upper_body.map(f=>(
                     <div key={f.key}><Label>{f.labelEn} {f.required&&<span className="text-burgundy">*</span>}</Label><Input name={f.key} type="number" step="0.5" required={!!f.required} placeholder={f.placeholder} /><div className="text-[10px] text-muted-foreground">{f.labelHa} • {f.key}</div></div>
@@ -104,7 +104,7 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
               </div>
 
               <div className="space-y-3">
-                <div className="font-semibold text-sm flex justify-between">Waist / Hip <span className="text-xs text-muted-foreground">{grouped.waist_torso.length} fields</span></div>
+                <div className="font-semibold text-sm flex justify-between dark:text-ivory">Waist / Hip <span className="text-xs text-muted-foreground dark:text-ivory/60">{grouped.waist_torso.length} fields</span></div>
                 <div className="grid md:grid-cols-3 gap-3">
                   {grouped.waist_torso.map(f=>(
                     <div key={f.key}><Label>{f.labelEn} {f.required&&<span className="text-burgundy">*</span>}</Label><Input name={f.key} type="number" step="0.5" required={!!f.required} placeholder={f.placeholder} /></div>
@@ -113,7 +113,7 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
               </div>
 
               <div className="space-y-3">
-                <div className="font-semibold text-sm flex justify-between">Lower body <span className="text-xs text-muted-foreground">{grouped.lower_body.length} fields</span></div>
+                <div className="font-semibold text-sm flex justify-between dark:text-ivory">Lower body <span className="text-xs text-muted-foreground dark:text-ivory/60">{grouped.lower_body.length} fields</span></div>
                 <div className="grid md:grid-cols-3 gap-3">
                   {grouped.lower_body.map(f=>(
                     <div key={f.key}><Label>{f.labelEn} {f.required&&<span className="text-burgundy">*</span>}</Label><Input name={f.key} type="number" step="0.5" required={!!f.required} placeholder={f.placeholder} /></div>
@@ -122,7 +122,7 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
               </div>
 
               <div className="space-y-3">
-                <div className="font-semibold text-sm flex justify-between">Lengths / Other <span className="text-xs text-muted-foreground">{grouped.other.length} fields</span></div>
+                <div className="font-semibold text-sm flex justify-between dark:text-ivory">Lengths / Other <span className="text-xs text-muted-foreground dark:text-ivory/60">{grouped.other.length} fields</span></div>
                 <div className="grid md:grid-cols-3 gap-3">
                   {grouped.other.map(f=>(
                     <div key={f.key}><Label>{f.labelEn} {f.required&&<span className="text-burgundy">*</span>}</Label><Input name={f.key} type="number" step="0.5" required={!!f.required} placeholder={f.placeholder} /></div>

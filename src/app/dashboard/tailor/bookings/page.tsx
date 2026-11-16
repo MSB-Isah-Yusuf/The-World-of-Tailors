@@ -110,7 +110,7 @@ export default async function TailorBookingsPage({ searchParams }: { searchParam
 
         <div className="flex flex-wrap gap-2 text-xs">
           {["ALL","REQUESTED","ACCEPTED","IN_PRODUCTION","READY","COMPLETED","ON_HOLD","DECLINED","CANCELLED"].map(s=>(
-            <Link key={s} href={`/dashboard/tailor/bookings${s==="ALL"?"":"?status="+s}`} className={`px-3 py-1.5 rounded-full border ${status===s?"bg-midnight text-white":"bg-white"}`}>{s} {stats[s]?`(${stats[s]})`:""}</Link>
+            <Link key={s} href={`/dashboard/tailor/bookings${s==="ALL"?"":"?status="+s}`} className={`px-3 py-1.5 rounded-full border transition ${status===s?"bg-midnight text-white dark:bg-gold dark:text-midnight dark:border-gold/50 dark:shadow-[0_0_12px_rgba(198,161,91,0.3)] font-semibold":"bg-white dark:bg-white/[0.06] dark:text-ivory dark:border-white/15 hover:bg-ivory dark:hover:bg-white/[0.10]"}`}>{s} {stats[s]?`(${stats[s]})`:""}</Link>
           ))}
         </div>
 
@@ -118,12 +118,12 @@ export default async function TailorBookingsPage({ searchParams }: { searchParam
           <CardHeader><CardTitle className="text-base">Your bookings — {total} total • Ownership-scoped (tailorId = {profile.id.slice(0,8)}…)</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             {bookings.length===0 ? (
-              <div className="rounded-xl border bg-white p-8 text-center text-sm text-muted-foreground">
-                No bookings for filter <code>{status}</code>. Create designs at <Link href="/dashboard/tailor/designs" className="underline">Design Portfolio</Link> and share <Link href={`/tailors/${profile.slug}`} className="underline">/tailors/{profile.slug}</Link> to receive REQUESTED bookings.
+              <div className="rounded-xl border bg-white dark:bg-white/[0.05] dark:border-white/10 p-8 text-center text-sm text-muted-foreground dark:text-ivory/60">
+                No bookings for filter <code>{status}</code>. Create designs at <Link href="/dashboard/tailor/designs" className="underline dark:text-gold">Design Portfolio</Link> and share <Link href={`/tailors/${profile.slug}`} className="underline dark:text-gold">/tailors/{profile.slug}</Link> to receive REQUESTED bookings.
                 <div className="mt-2 text-xs">Demo: log in as <code>customer@demo.twt.ng / DemoPass123!</code> → book at /tailors → tailor sees it here.</div>
               </div>
             ) : bookings.map((b:any)=>(
-              <div key={b.id} className="rounded-xl border bg-white p-4 space-y-3">
+              <div key={b.id} className="rounded-xl border bg-white dark:bg-white/[0.06] dark:border-white/10 p-4 space-y-3">
                 <div className="flex flex-wrap justify-between gap-2">
                   <div className="text-sm">
                     <span className="font-semibold">{b.reference}</span> • {b.customer.name} ({b.customer.email}) • {b.design?.title || "Bespoke (no design)"}
@@ -148,7 +148,7 @@ export default async function TailorBookingsPage({ searchParams }: { searchParam
             ))}
             <div className="flex justify-between text-xs pt-2">
               <span className="text-muted-foreground">All mutations check <code>booking.tailorId === profile.id</code> and validate {`{from→to}` } against allow-list; history immutable.</span>
-              <span className="flex gap-2">{page>1 && <Link href={`/dashboard/tailor/bookings?status=${status}&page=${page-1}`} className="px-3 py-1 rounded-full border bg-white">← Prev</Link>}{bookings.length===pageSize && <Link href={`/dashboard/tailor/bookings?status=${status}&page=${page+1}`} className="px-3 py-1 rounded-full border bg-white">Next →</Link>}</span>
+              <span className="flex gap-2">{page>1 && <Link href={`/dashboard/tailor/bookings?status=${status}&page=${page-1}`} className="px-3 py-1 rounded-full border bg-white dark:bg-white/[0.06] dark:text-ivory dark:border-white/15">← Prev</Link>}{bookings.length===pageSize && <Link href={`/dashboard/tailor/bookings?status=${status}&page=${page+1}`} className="px-3 py-1 rounded-full border bg-white dark:bg-white/[0.06] dark:text-ivory dark:border-white/15">Next →</Link>}</span>
             </div>
           </CardContent>
         </Card>

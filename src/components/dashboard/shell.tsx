@@ -10,9 +10,9 @@ export function DashboardShell({ role, title, nav, children }: { role: string; t
   };
   const bg = roleColor[role] || "bg-midnight";
   return (
-    <div className="min-h-screen bg-ivory flex">
+    <div className="min-h-screen bg-ivory dark:bg-midnight flex">
       {/* Sidebar — deep navy refined */}
-      <aside className="hidden lg:flex w-[260px] shrink-0 flex-col bg-midnight text-ivory">
+      <aside className="hidden lg:flex w:[260px] shrink-0 flex-col bg-midnight text-ivory">
         <div className="px-6 pt-6 pb-4 border-b border-white/10">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-white/10 border border-gold/30 grid place-items-center text-gold text-xs font-bold">TWT</div>
@@ -43,18 +43,18 @@ export function DashboardShell({ role, title, nav, children }: { role: string; t
 
       {/* Main */}
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="h-14 bg-white border-b border-midnight/10 flex items-center justify-between px-6">
+        <header className="h-14 bg-white dark:bg-midnight dark:border-white/10 border-b border-midnight/10 flex items-center justify-between px-6">
           <div className="flex items-center gap-3">
-            <span className="lg:hidden font-display font-semibold">TWT • {role}</span>
-            <span className="hidden lg:block text-xs tracking-[0.16em] text-taupe font-semibold">{title.toUpperCase()} WORKSPACE</span>
-            <span className="hidden sm:inline text-xs text-taupe">• Secure • Paystack • Mapbox ready</span>
+            <span className="lg:hidden font-display font-semibold dark:text-ivory">TWT • {role}</span>
+            <span className="hidden lg:block text-xs tracking-[0.16em] text-taupe dark:text-ivory/60 font-semibold">{title.toUpperCase()} WORKSPACE</span>
+            <span className="hidden sm:inline text-xs text-taupe dark:text-ivory/50">• Secure • Paystack • Mapbox ready</span>
           </div>
           <div className="flex items-center gap-2">
-            <button className="h-8 w-8 grid place-items-center rounded-full bg-ivory border"><Bell className="h-4 w-4" /></button>
+            <button className="h-8 w-8 grid place-items-center rounded-full bg-ivory dark:bg-white/10 dark:text-ivory border dark:border-white/10"><Bell className="h-4 w-4" /></button>
             <div className="h-8 w-8 rounded-full bg-plum text-white grid place-items-center text-xs">U</div>
           </div>
         </header>
-        <main className="flex-1 p-6 bg-ivory">{children}</main>
+        <main className="flex-1 p-6 bg-ivory dark:bg-midnight dark:text-ivory">{children}</main>
       </div>
     </div>
   );

@@ -28,7 +28,7 @@ const NAV = [
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   await requireRole(["ADMIN"]);
   return (
-    <div className="min-h-screen bg-ivory flex">
+    <div className="min-h-screen bg-ivory dark:bg-midnight flex">
       <aside className="hidden lg:flex w-[270px] shrink-0 flex-col bg-midnight text-ivory sticky top-0 h-screen overflow-auto">
         <div className="px-6 pt-6 pb-4 border-b border-white/10">
           <Link href="/admin" className="flex items-center gap-2">

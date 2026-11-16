@@ -100,6 +100,11 @@
 .text-display { font-family: Playfair Display, serif; }
 .tracking-tight-custom { letter-spacing: -0.03em; }
 
+/* Admin/bookings explicit dark shells — these pages use min-h-screen bg-ivory outside AdvancedShell */
+.dark main.bg-ivory { background-color: hsl(var(--background)) !important; }
+.dark header.bg-white { background-color: hsl(var(--card)) !important; border-color: rgba(255,255,255,0.08) !important; }
+.dark .min-h-screen.bg-ivory { background-color: hsl(var(--background)) !important; }
+
 /* Dark-mode input visibility fix — raw inputs without Input component (e.g., w-full h-9 rounded-xl border bg-white) */
 .dark input,
 .dark textarea,
