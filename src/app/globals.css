@@ -99,3 +99,25 @@
 /* Typography scale helpers */
 .text-display { font-family: Playfair Display, serif; }
 .tracking-tight-custom { letter-spacing: -0.03em; }
+
+/* Dark-mode input visibility fix — raw inputs without Input component (e.g., w-full h-9 rounded-xl border bg-white) */
+.dark input,
+.dark textarea,
+.dark select {
+  background-color: rgba(16,24,43,0.6) !important;
+  border-color: rgba(255,255,255,0.15) !important;
+  color: #F8F4EC !important;
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: rgba(248,244,236,0.45) !important;
+}
+.dark input:focus,
+.dark textarea:focus,
+.dark select:focus {
+  border-color: rgba(198,161,91,0.5) !important;
+}
+.dark select option {
+  background-color: #10182B;
+  color: #F8F4EC;
+}
