@@ -26,13 +26,22 @@ const defs = [
   { key:"full_length", labelEn:"Full body length", labelHa:"Tsawon jiki", category:"other", sortOrder:23 },
   { key:"dress_length", labelEn:"Dress length", labelHa:"Tsawon riga", category:"other", sortOrder:24 },
   { key:"shoulder_to_waist", labelEn:"Shoulder to waist", labelHa:"Kafada zuwa kugu", category:"other", sortOrder:25 },
+  // Agbada/native extensions — restore master list
+  { key:"shirt_length", labelEn:"Shirt / Kaftan length", labelHa:"Tsawon riga SHIRT", category:"other", sortOrder:26 },
+  { key:"agbada_length", labelEn:"Agbada full length", labelHa:"Tsawon agbada", category:"other", sortOrder:27 },
+  { key:"ankle", labelEn:"Ankle", labelHa:"Idon sawu", category:"lower_body", sortOrder:28 },
+  { key:"hat_size", labelEn:"Hat size", labelHa:"Girman hula", category:"other", sortOrder:29 },
+  { key:"full_hip", labelEn:"Full hip", labelHa:"Cikakken kugu", category:"waist_torso", sortOrder:16 }, // dedup kept above
 ];
 
 export async function seedMeasurementDefinitions() {
-  for (const d of defs) {
-    await prisma.measurementDefinition.upsert({ where:{ key:d.key }, update:{ labelEn:d.labelEn, labelHa:d.labelHa }, create:{ key:d.key, labelEn:d.labelEn, labelHa:d.labelHa, category:d.category, sortOrder:d.sortOrder, helpEn:(d as any).helpEn, helpHa:(d as any).helpHa, gender: (d as any).gender || undefined } });
+  // deduplicate by key keeping last
+  const byKey = new Map<string, any>();
+  for (const d of defs) byKey.set(d.key, d);
+  for (const d of byKey.values()) {
+    await prisma.measurementDefinition.upsert({ where:{ key:d.key }, update:{ labelEn:d.labelEn, labelHa:d.labelHa, category:d.category, sortOrder:d.sortOrder }, create:{ key:d.key, labelEn:d.labelEn, labelHa:d.labelHa, category:d.category, sortOrder:d.sortOrder, helpEn:(d as any).helpEn, helpHa:(d as any).helpHa, gender: (d as any).gender || undefined } });
   }
-  console.log(`[seed] ${defs.length} measurement definitions`);
+  console.log(`[seed] ${byKey.size} measurement definitions`);
 }
 
 if (require.main===module) seedMeasurementDefinitions().then(()=>prisma.$disconnect());
