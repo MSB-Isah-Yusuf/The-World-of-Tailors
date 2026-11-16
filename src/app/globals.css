@@ -121,3 +121,66 @@
   background-color: #10182B;
   color: #F8F4EC;
 }
+
+/* ================= DARK THEME PLATFORM-WIDE — white → midnight mapping ================= */
+/* Every explicit bg-white surface becomes a subtle dark elevation — cards themselves are already --card (midnight 14%) */
+.dark .bg-white {
+  background-color: rgba(255,255,255,0.06) !important;
+  border-color: rgba(255,255,255,0.10) !important;
+  color: #F8F4EC !important;
+}
+.dark .bg-white\/90 { background-color: rgba(16,24,43,0.78) !important; border-color: rgba(255,255,255,0.10) !important; }
+.dark .bg-white\/85, .dark .bg-white\/80 { background-color: rgba(16,24,43,0.72) !important; }
+/* Page shells that were ivory/cream should match page background (midnight) so Cards pop */
+.dark .bg-ivory,
+.dark .bg-\[\#FFFBF0\],
+.dark .bg-\[\#FFFBF0\].min-h-screen,
+.dark .bg-ivory.min-h-screen {
+  background-color: hsl(var(--background)) !important;
+}
+/* Alternating rows/cards that were bg-ivory inside cards — give them a slightly lighter dark elevation */
+.dark .bg-ivory.border,
+.dark .rounded-xl.bg-ivory,
+.dark .rounded-2xl.bg-ivory { background-color: rgba(255,255,255,0.04) !important; border-color: rgba(255,255,255,0.08) !important; }
+.dark .bg-champagne { background-color: rgba(255,255,255,0.08) !important; color: #F8F4EC !important; border-color: rgba(255,255,255,0.12) !important; }
+.dark .bg-emerald-50 { background-color: rgba(20,84,71,0.18) !important; border-color: rgba(52,211,153,0.25) !important; color: #6ee7b7 !important; }
+.dark .bg-amber-100 { background-color: rgba(251,191,36,0.14) !important; border-color: rgba(251,191,36,0.25) !important; color: #fde68a !important; }
+.dark .bg-amber-50 { background-color: rgba(251,191,36,0.12) !important; border-color: rgba(251,191,36,0.2) !important; }
+.dark .bg-burgundy { background-color: #7f1d2e !important; }
+.dark .border-amber-200 { border-color: rgba(251,191,36,0.25) !important; }
+.dark .border-emerald-200 { border-color: rgba(52,211,153,0.25) !important; }
+.dark .text-amber-800 { color: #fde68a !important; }
+.dark .text-emerald-800, .dark .text-emerald-900 { color: #6ee7b7 !important; }
+.dark .text-amber-700 { color: #fcd34d !important; }
+.dark .text-emerald-700 { color: #34d399 !important; }
+.dark .text-taupe { color: rgba(248,244,236,0.65) !important; }
+.dark .text-midnight { color: #F8F4EC !important; }
+.dark .border-midnight\/10, .dark .border-midnight\/15 { border-color: rgba(255,255,255,0.10) !important; }
+/* Header glass in dark — use midnight glass */
+.dark .glass { background: rgba(16,24,43,0.82) !important; border-color: rgba(255,255,255,0.08) !important; box-shadow: 0 8px 24px rgba(0,0,0,0.35) !important; }
+.dark .glass .text-midnight { color: #F8F4EC !important; }
+.dark .glass .hover\:text-plum:hover { color: #C6A15B !important; }
+/* Alternate / filter pills — unselected are subtle dark (via .bg-white rule above), selected must STAND OUT */
+.dark .rounded-full.bg-midnight,
+.dark a.rounded-full.bg-midnight,
+.dark .rounded-full.bg-midnight.text-white,
+.dark a[class*=\"rounded-full\"][class*=\"bg-midnight\"] {
+  background-color: #C6A15B !important;
+  color: #10182B !important;
+  border-color: rgba(198,161,91,0.55) !important;
+  box-shadow: 0 0 14px rgba(198,161,91,0.35), 0 2px 8px rgba(0,0,0,0.25) !important;
+  font-weight: 600;
+}
+.dark .rounded-full.bg-emeraldDeep,
+.dark a.rounded-full.bg-emeraldDeep {
+  box-shadow: 0 0 10px rgba(20,84,71,0.4) !important;
+  border-color: rgba(52,211,153,0.35) !important;
+}
+/* Selected draft amber pill — enhance contrast */
+.dark .rounded-full.bg-amber-100 { background-color: rgba(251,191,36,0.22) !important; color: #fef3c7 !important; border-color: rgba(251,191,36,0.35) !important; box-shadow: 0 0 10px rgba(251,191,36,0.2) !important; }
+/* View-all / outline buttons that were bg-white — already mapped to 0.06, add hover highlight */
+.dark a.border.bg-white:hover, .dark button.border.bg-white:hover { background-color: rgba(255,255,255,0.10) !important; border-color: rgba(255,255,255,0.18) !important; }
+/* Nested row surfaces: .border.rounded-xl.p-3.bg-white inside a Card should be one step lighter than Card */
+.dark .rounded-xl.bg-white.p-3, .dark .rounded-xl.bg-white.p-4, .dark .border.bg-white.rounded-xl { background-color: rgba(255,255,255,0.05) !important; }
+/* Ensure muted text inside dark surfaces stays legible */
+.dark .bg-white .text-muted-foreground, .dark .bg-white\/90 .text-muted-foreground { color: rgba(248,244,236,0.62) !important; }
