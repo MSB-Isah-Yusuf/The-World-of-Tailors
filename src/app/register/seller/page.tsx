@@ -32,11 +32,15 @@ async function createSeller(formData: FormData) {
   try {
     const hash = await bcrypt.hash(password, 10);
     const slug = businessName.toLowerCase().replace(/[^a-z0-9]+/g,"-").slice(0,60)+"-"+Date.now().toString().slice(-4);
-    const user = await prisma.user.create({ data: { name, email, passwordHash: hash, role: "FABRIC_SELLER", phone, status: "ACTIVE" } });
-    await prisma.sellerProfile.create({ data: { userId: user.id, businessName, slug, city, state, country, countryCode, lga, address, latitude, longitude, deliveryCoverageKm, pickupAvailable, businessStatus: "PENDING", isPublished: false } });
-    await prisma.auditLog.create({ data:{ userId: user.id, action:"REGISTER_SELLER", entity:"SellerProfile", entityId: user.id, metadata:{ businessName, state, city } } });
+    await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({ data: { name, email, passwordHash: hash, role: "FABRIC_SELLER", phone, status: "ACTIVE" } });
+      await tx.sellerProfile.create({ data: { userId: user.id, businessName, slug, city, state, country, countryCode, lga, address, latitude, longitude, deliveryCoverageKm, pickupAvailable, businessStatus: "PENDING", isPublished: false } });
+      await tx.auditLog.create({ data:{ userId: user.id, action:"REGISTER_SELLER", entity:"SellerProfile", entityId: user.id, metadata:{ businessName, state, city } } });
+    });
     redirect("/login?registered=seller&email=" + encodeURIComponent(email));
   } catch (e:any) {
+    if (e?.digest?.includes("NEXT_REDIRECT")) throw e;
+    if (String(e?.message||"").includes("NEXT_REDIRECT")) throw e;
     if (e?.code === "P2002" || String(e?.message||"").includes("Unique constraint")) redirect(`/register/seller?error=EmailExists&email=${encodeURIComponent(email)}`);
     redirect(`/register/seller?error=CreateFailed&email=${encodeURIComponent(email)}`);
   }

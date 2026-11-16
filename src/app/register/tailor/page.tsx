@@ -34,11 +34,15 @@ async function createTailor(formData: FormData) {
   try {
     const hash = await bcrypt.hash(password, 10);
     const slug = businessName.toLowerCase().replace(/[^a-z0-9]+/g,"-").slice(0,60)+"-"+Date.now().toString().slice(-4);
-    const user = await prisma.user.create({ data: { name, email, passwordHash: hash, role: "TAILOR", phone, status: "ACTIVE" } });
-    await prisma.tailorProfile.create({ data: { userId: user.id, businessName, slug, bio, specialties: JSON.stringify(specialties.split(",").map(s=>s.trim())), city, state, country, countryCode, lga, address, street, latitude, longitude, serviceRadiusKm, businessStatus: "PENDING", isPublished: false } });
-    await prisma.auditLog.create({ data:{ userId: user.id, action:"REGISTER_TAILOR", entity:"TailorProfile", entityId: user.id, metadata:{ businessName, state, city, lat:latitude, lng:longitude } } });
+    await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({ data: { name, email, passwordHash: hash, role: "TAILOR", phone, status: "ACTIVE" } });
+      await tx.tailorProfile.create({ data: { userId: user.id, businessName, slug, bio, specialties: JSON.stringify(specialties.split(",").map(s=>s.trim())), city, state, country, countryCode, lga, address, street, latitude, longitude, serviceRadiusKm, businessStatus: "PENDING", isPublished: false } });
+      await tx.auditLog.create({ data:{ userId: user.id, action:"REGISTER_TAILOR", entity:"TailorProfile", entityId: user.id, metadata:{ businessName, state, city, lat:latitude, lng:longitude } } });
+    });
     redirect("/login?registered=tailor&email=" + encodeURIComponent(email));
   } catch (e:any) {
+    if (e?.digest?.includes("NEXT_REDIRECT")) throw e;
+    if (String(e?.message||"").includes("NEXT_REDIRECT")) throw e;
     if (e?.code === "P2002" || String(e?.message||"").includes("Unique constraint")) redirect(`/register/tailor?error=EmailExists&email=${encodeURIComponent(email)}`);
     redirect(`/register/tailor?error=CreateFailed&email=${encodeURIComponent(email)}`);
   }

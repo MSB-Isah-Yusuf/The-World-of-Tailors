@@ -26,6 +26,8 @@ async function createCustomer(formData: FormData) {
     await prisma.user.create({ data: { name, email, passwordHash: hash, role: "CUSTOMER", phone, status: "ACTIVE" } });
     redirect("/login?registered=customer&email=" + encodeURIComponent(email));
   } catch (e:any) {
+    if (e?.digest?.includes("NEXT_REDIRECT")) throw e;
+    if (String(e?.message||"").includes("NEXT_REDIRECT")) throw e;
     // race: unique constraint P2002
     if (e?.code === "P2002" || String(e?.message||"").includes("Unique constraint")) {
       redirect(`/register/customer?error=EmailExists&email=${encodeURIComponent(email)}`);
