@@ -4,8 +4,8 @@
 
 @layer base {
   :root {
-    /* Light boutique mode — warm ivory foundations */
-    --background: 38 22% 95%; /* #F8F4EC */
+    /* Light boutique — warm ivory foundations, plum primary */
+    --background: 38 22% 95%; /* #F8F4EC warm ivory */
     --foreground: 240 6% 15%; /* charcoal #24252B */
     --card: 0 0% 100%;
     --card-foreground: 240 6% 15%;
@@ -15,41 +15,46 @@
     --primary-foreground: 38 22% 95%;
     --secondary: 38 24% 84%; /* Champagne #E8D8BB */
     --secondary-foreground: 240 6% 15%;
-    --muted: 36 12% 68%;
+    --muted: 38 12% 88%;
     --muted-foreground: 30 6% 52%; /* taupe #8B8178 */
-    --accent: 38 44% 57%; /* Antique Gold #C6A15B */
+    --accent: 38 44% 57%; /* Antique Gold #C6A15B / #E8B94E variant */
     --accent-foreground: 223 44% 11%;
     --destructive: 350 37% 32%; /* burgundy */
     --destructive-foreground: 0 0% 98%;
     --border: 38 18% 87%;
     --input: 38 18% 87%;
-    --ring: 164 56% 20%; /* emerald */
+    --ring: 164 56% 20%;
     --radius: 0.9rem;
-
-    /* Semantic */
-    --success: 164 56% 20%;
+    --success: 148 43% 50%; /* #49B77A */
     --warning: 38 92% 50%;
     --info: 223 44% 11%;
+    color-scheme: light;
   }
   .dark {
-    /* Dark luxury — midnight navy surfaces */
-    --background: 223 44% 11%; /* #10182B */
-    --foreground: 38 22% 95%;
-    --card: 223 35% 14%;
-    --card-foreground: 38 22% 95%;
-    --popover: 223 35% 14%;
-    --popover-foreground: 38 22% 95%;
-    --primary: 38 44% 57%; /* gold on dark */
-    --primary-foreground: 223 44% 11%;
-    --secondary: 302 34% 23%;
-    --secondary-foreground: 38 22% 95%;
-    --muted: 223 15% 22%;
-    --muted-foreground: 38 12% 72%;
-    --accent: 164 56% 20%;
-    --accent-foreground: 38 22% 95%;
-    --border: 223 25% 18%;
-    --input: 223 25% 18%;
-    --ring: 38 44% 57%;
+    /* Reference image palette — deep charcoal hierarchy */
+    --background: 0 0% 10%; /* #191919 main workspace */
+    --foreground: 40 14% 95%; /* #F5F3EF primary text */
+    --card: 0 0% 16%; /* #292929 primary surface */
+    --card-foreground: 40 14% 95%;
+    --popover: 0 0% 19%; /* #303030 elevated */
+    --popover-foreground: 40 14% 95%;
+    --primary: 19 88% 54%; /* #F16A24 orange accent */
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 13%; /* #222222 secondary surface / sidebar */
+    --secondary-foreground: 40 14% 95%;
+    --muted: 0 0% 14%; /* #242424 outer background */
+    --muted-foreground: 40 7% 70%; /* #B8B5AE secondary text */
+    --accent: 43 77% 61%; /* #E8B94E gold highlight */
+    --accent-foreground: 0 0% 10%;
+    --destructive: 4 66% 64%; /* #E36C63 */
+    --destructive-foreground: 0 0% 98%;
+    --border: 30 4% 22%; /* #3A3936 */
+    --input: 0 0% 13%; /* #202020 */
+    --ring: 25 86% 66%; /* #F3A15E focus */
+    --success: 148 43% 50%;
+    --warning: 38 92% 50%;
+    --info: 223 44% 11%;
+    color-scheme: dark;
   }
 }
 
@@ -59,7 +64,7 @@
   h1,h2,h3,h4 { font-family: Playfair Display, DM Serif Display, serif; letter-spacing: -0.02em; }
 }
 
-/* Glass — use sparingly */
+/* Glass */
 .glass {
   background: rgba(255,255,255,0.74);
   backdrop-filter: blur(16px) saturate(180%);
@@ -68,7 +73,7 @@
   box-shadow: 0 12px 32px rgba(16,24,43,0.08);
 }
 .glass-dark {
-  background: rgba(16,24,43,0.72);
+  background: rgba(25,25,25,0.72);
   backdrop-filter: blur(16px) saturate(160%);
   border: 1px solid rgba(255,255,255,0.08);
 }
@@ -78,114 +83,214 @@
   border: 1px solid rgba(81,37,79,0.12);
 }
 
-/* Premium gradients */
+/* Premium gradients — light keeps navy/plum, dark shifts to charcoal/orange depth */
 .gradient-navy-plum { background: linear-gradient(135deg,#10182B 0%, #51254F 100%); }
 .gradient-emerald-navy { background: linear-gradient(135deg,#145447 0%, #10182B 100%); }
 .gradient-burgundy-plum { background: linear-gradient(135deg,#722F45 0%, #51254F 100%); }
 .gradient-champagne-ivory { background: linear-gradient(135deg,#E8D8BB 0%, #F8F4EC 100%); }
+.dark .gradient-champagne-ivory { background: linear-gradient(135deg, #2A2A2A 0%, #303030 100%) !important; border: 1px solid #3A3936 !important; }
+.dark .gradient-navy-plum { background: linear-gradient(135deg, #1E1E1E 0%, #242424 100%) !important; }
 .text-gold { color: #C6A15B; }
+.dark .text-gold { color: #E8B94E !important; }
 .border-gold { border-color: rgba(198,161,91,0.35); }
+.dark .border-gold { border-color: rgba(232,185,78,0.35) !important; }
 .shadow-premium { box-shadow: 0 16px 40px rgba(16,24,43,0.12); }
+.dark .shadow-premium { box-shadow: 0 16px 40px rgba(0,0,0,0.45) !important; }
 .shadow-soft { box-shadow: 0 2px 12px rgba(16,24,43,0.07); }
+.dark .shadow-soft { box-shadow: 0 2px 12px rgba(0,0,0,0.35) !important; }
 
-/* Focus */
+/* Focus — #F3A15E orange focus */
 *:focus-visible { outline: 2px solid #C6A15B; outline-offset: 2px; }
+.dark *:focus-visible { outline-color: #F3A15E !important; }
 
-/* Motion */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
-
-/* Typography scale helpers */
 .text-display { font-family: Playfair Display, serif; }
 .tracking-tight-custom { letter-spacing: -0.03em; }
 
-/* Admin/bookings explicit dark shells — these pages use min-h-screen bg-ivory outside AdvancedShell */
-.dark main.bg-ivory { background-color: hsl(var(--background)) !important; }
-.dark header.bg-white { background-color: hsl(var(--card)) !important; border-color: rgba(255,255,255,0.08) !important; }
-.dark .min-h-screen.bg-ivory { background-color: hsl(var(--background)) !important; }
+/* ================= DARK THEME COMPREHENSIVE — Reference charcoal hierarchy ================= */
 
-/* Dark-mode input visibility fix — raw inputs without Input component (e.g., w-full h-9 rounded-xl border bg-white) */
+/* Page shells that were ivory/cream become charcoal #191919 so Cards pop as #292929 */
+.dark .bg-ivory,
+.dark .bg-\[\#FFFBF0\],
+.dark .bg-\[\#FFFBF0\].min-h-screen,
+.dark .min-h-screen.bg-ivory,
+.dark .bg-background {
+  background-color: #191919 !important;
+}
+.dark body { background-color: #191919 !important; }
+
+/* Every explicit bg-white surface becomes subtle dark elevation #292929/#2A2A2A */
+.dark .bg-white {
+  background-color: #292929 !important;
+  border-color: #3A3936 !important;
+  color: #F5F3EF !important;
+}
+.dark .bg-white\/90 { background-color: rgba(25,25,25,0.92) !important; border-color: rgba(58,57,54,0.9) !important; color: #F5F3EF !important; }
+.dark .bg-white\/85, .dark .bg-white\/80 { background-color: rgba(25,25,25,0.85) !important; border-color: #3A3936 !important; }
+.dark .bg-gray-50, .dark .bg-gray-100, .dark .bg-slate-50 { background-color: #242424 !important; border-color: #3A3936 !important; color: #F5F3EF !important; }
+
+/* Header glass in dark — charcoal glass */
+.dark .glass { background: rgba(25,25,25,0.92) !important; border-color: rgba(58,57,54,0.9) !important; box-shadow: 0 8px 24px rgba(0,0,0,0.5) !important; }
+.dark .glass .text-midnight { color: #F5F3EF !important; }
+.dark .glass .hover\:text-plum:hover { color: #F16A24 !important; }
+
+/* Alternating rows that were bg-ivory inside cards — slightly lighter than card */
+.dark .bg-ivory.border,
+.dark .rounded-xl.bg-ivory,
+.dark .rounded-2xl.bg-ivory,
+.dark .bg-champagne {
+  background-color: #303030 !important;
+  color: #F5F3EF !important;
+  border-color: #3A3936 !important;
+}
+.dark .bg-champagne\/20, .dark .bg-champagne\/30 { background-color: rgba(48,48,48,0.6) !important; }
+
+/* Emerald / amber status surfaces */
+.dark .bg-emerald-50 { background-color: rgba(73,183,122,0.14) !important; border-color: rgba(73,183,122,0.30) !important; color: #6ee7b7 !important; }
+.dark .bg-emerald-100 { background-color: rgba(73,183,122,0.18) !important; border-color: rgba(73,183,122,0.30) !important; color: #6ee7b7 !important; }
+.dark .bg-amber-100 { background-color: rgba(232,185,78,0.14) !important; border-color: rgba(232,185,78,0.30) !important; color: #FDE68A !important; }
+.dark .bg-amber-50 { background-color: rgba(232,185,78,0.12) !important; border-color: rgba(232,185,78,0.25) !important; color: #FDE68A !important; }
+.dark .bg-burgundy { background-color: #7f1d2e !important; color: #FEE2E2 !important; }
+.dark .border-amber-200 { border-color: rgba(232,185,78,0.30) !important; }
+.dark .border-emerald-200 { border-color: rgba(73,183,122,0.30) !important; }
+.dark .text-amber-800 { color: #FDE68A !important; }
+.dark .text-emerald-800, .dark .text-emerald-900 { color: #6ee7b7 !important; }
+.dark .text-amber-700 { color: #FCD34D !important; }
+.dark .text-emerald-700 { color: #49B77A !important; }
+.dark .text-amber-600 { color: #E8B94E !important; }
+
+/* Text hierarchy — charcoal dark reads as ivory */
+.dark .text-midnight { color: #F5F3EF !important; }
+.dark .text-charcoal { color: #F5F3EF !important; }
+.dark .text-taupe { color: #B8B5AE !important; }
+.dark .text-ivory { color: #F5F3EF !important; }
+.dark .text-ivory\/60, .dark .text-ivory\/70, .dark .text-ivory\/80, .dark .text-ivory\/90 { color: #F5F3EF !important; opacity: 0.9; }
+.dark .text-white { color: #F5F3EF !important; }
+.dark .text-muted-foreground { color: #B8B5AE !important; }
+.dark .text-zinc-500, .dark .text-zinc-600, .dark .text-gray-500, .dark .text-gray-600 { color: #B8B5AE !important; }
+.dark .text-black { color: #F5F3EF !important; }
+.dark .bg-white .text-muted-foreground, .dark .bg-white\/90 .text-muted-foreground { color: #B8B5AE !important; }
+.dark h1, .dark h2, .dark h3, .dark h4 { color: #F5F3EF !important; }
+.dark p { color: #F5F3EF; }
+.dark .text-plum { color: #E8B94E !important; }
+.dark .text-burgundy { color: #E36C63 !important; }
+.dark .text-plum\/80, .dark .hover\:text-plum:hover { color: #F16A24 !important; }
+
+/* Borders */
+.dark .border-midnight\/10, .dark .border-midnight\/15, .dark .border-midnight\/20 { border-color: #3A3936 !important; }
+.dark .border-plum\/10, .dark .border-plum\/20 { border-color: #3A3936 !important; }
+.dark .border { border-color: #3A3936 !important; }
+.dark hr { border-color: #3A3936 !important; }
+
+/* Header specifics — keep dark top bar as outer background #242424 */
+.dark header.bg-white { background-color: #222222 !important; border-color: #3A3936 !important; }
+.dark .bg-midnight { background-color: #242424 !important; border-color: #3A3936 !important; color: #F5F3EF !important; }
+/* But selected pills must STAND OUT — orange primary */
+.dark .rounded-full.bg-midnight,
+.dark a.rounded-full.bg-midnight,
+.dark .rounded-full.bg-midnight.text-white,
+.dark button.rounded-full.bg-midnight,
+.dark a[class*="rounded-full"][class*="bg-midnight"] {
+  background-color: #F16A24 !important;
+  color: #FFFFFF !important;
+  border-color: #F16A24 !important;
+  box-shadow: 0 0 14px rgba(241,106,36,0.35), 0 2px 8px rgba(0,0,0,0.35) !important;
+  font-weight: 600;
+}
+.dark .bg-midnight.text-white { color: #FFFFFF !important; }
+.dark .rounded-full.bg-emeraldDeep,
+.dark a.rounded-full.bg-emeraldDeep,
+.dark .bg-emeraldDeep {
+  background-color: #145447 !important;
+  border-color: rgba(73,183,122,0.35) !important;
+  box-shadow: 0 0 10px rgba(73,183,122,0.25) !important;
+}
+.dark .bg-plum { background-color: #51254F !important; border-color: rgba(81,37,79,0.5) !important; }
+.dark .bg-gold { background-color: #E8B94E !important; color: #191919 !important; border-color: rgba(232,185,78,0.5) !important; }
+
+/* Selected filter pills — amber draft */
+.dark .rounded-full.bg-amber-100,
+.dark a.rounded-full.bg-amber-100 {
+  background-color: rgba(232,185,78,0.22) !important;
+  color: #FEF3C7 !important;
+  border-color: rgba(232,185,78,0.40) !important;
+  box-shadow: 0 0 10px rgba(232,185,78,0.25) !important;
+}
+.dark .bg-amber-100.text-amber-800 { color: #FEF3C7 !important; }
+
+/* View-all / outline hover */
+.dark a.border.bg-white:hover, .dark button.border.bg-white:hover { background-color: #303030 !important; border-color: #4A4946 !important; }
+.dark a.border:hover, .dark button.border:hover { border-color: #4A4946 !important; }
+
+/* Nested row surfaces inside Card */
+.dark .rounded-xl.bg-white.p-3, .dark .rounded-xl.bg-white.p-4,
+.dark .rounded-2xl.bg-white, .dark .border.bg-white.rounded-xl {
+  background-color: #2A2A2A !important;
+  border-color: #3A3936 !important;
+}
+
+/* Inputs — deep #202020, visible placeholder #85827D / #B8B5AE */
 .dark input,
 .dark textarea,
 .dark select {
-  background-color: rgba(16,24,43,0.6) !important;
-  border-color: rgba(255,255,255,0.15) !important;
-  color: #F8F4EC !important;
+  background-color: #202020 !important;
+  border-color: #3A3936 !important;
+  color: #F5F3EF !important;
 }
 .dark input::placeholder,
 .dark textarea::placeholder {
-  color: rgba(248,244,236,0.45) !important;
+  color: #85827D !important;
+  opacity: 1 !important;
 }
 .dark input:focus,
 .dark textarea:focus,
 .dark select:focus {
-  border-color: rgba(198,161,91,0.5) !important;
+  border-color: #F3A15E !important;
+  box-shadow: 0 0 0 2px rgba(243,161,94,0.20) !important;
+  outline: none !important;
 }
 .dark select option {
-  background-color: #10182B;
-  color: #F8F4EC;
+  background-color: #202020;
+  color: #F5F3EF;
 }
+.dark input[type="number"] { color: #F5F3EF !important; }
 
-/* ================= DARK THEME PLATFORM-WIDE — white → midnight mapping ================= */
-/* Every explicit bg-white surface becomes a subtle dark elevation — cards themselves are already --card (midnight 14%) */
-.dark .bg-white {
-  background-color: rgba(255,255,255,0.06) !important;
-  border-color: rgba(255,255,255,0.10) !important;
-  color: #F8F4EC !important;
-}
-.dark .bg-white\/90 { background-color: rgba(16,24,43,0.78) !important; border-color: rgba(255,255,255,0.10) !important; }
-.dark .bg-white\/85, .dark .bg-white\/80 { background-color: rgba(16,24,43,0.72) !important; }
-/* Page shells that were ivory/cream should match page background (midnight) so Cards pop */
-.dark .bg-ivory,
-.dark .bg-\[\#FFFBF0\],
-.dark .bg-\[\#FFFBF0\].min-h-screen,
-.dark .bg-ivory.min-h-screen {
-  background-color: hsl(var(--background)) !important;
-}
-/* Alternating rows/cards that were bg-ivory inside cards — give them a slightly lighter dark elevation */
-.dark .bg-ivory.border,
-.dark .rounded-xl.bg-ivory,
-.dark .rounded-2xl.bg-ivory { background-color: rgba(255,255,255,0.04) !important; border-color: rgba(255,255,255,0.08) !important; }
-.dark .bg-champagne { background-color: rgba(255,255,255,0.08) !important; color: #F8F4EC !important; border-color: rgba(255,255,255,0.12) !important; }
-.dark .bg-emerald-50 { background-color: rgba(20,84,71,0.18) !important; border-color: rgba(52,211,153,0.25) !important; color: #6ee7b7 !important; }
-.dark .bg-amber-100 { background-color: rgba(251,191,36,0.14) !important; border-color: rgba(251,191,36,0.25) !important; color: #fde68a !important; }
-.dark .bg-amber-50 { background-color: rgba(251,191,36,0.12) !important; border-color: rgba(251,191,36,0.2) !important; }
-.dark .bg-burgundy { background-color: #7f1d2e !important; }
-.dark .border-amber-200 { border-color: rgba(251,191,36,0.25) !important; }
-.dark .border-emerald-200 { border-color: rgba(52,211,153,0.25) !important; }
-.dark .text-amber-800 { color: #fde68a !important; }
-.dark .text-emerald-800, .dark .text-emerald-900 { color: #6ee7b7 !important; }
-.dark .text-amber-700 { color: #fcd34d !important; }
-.dark .text-emerald-700 { color: #34d399 !important; }
-.dark .text-taupe { color: rgba(248,244,236,0.65) !important; }
-.dark .text-midnight { color: #F8F4EC !important; }
-.dark .border-midnight\/10, .dark .border-midnight\/15 { border-color: rgba(255,255,255,0.10) !important; }
-/* Header glass in dark — use midnight glass */
-.dark .glass { background: rgba(16,24,43,0.82) !important; border-color: rgba(255,255,255,0.08) !important; box-shadow: 0 8px 24px rgba(0,0,0,0.35) !important; }
-.dark .glass .text-midnight { color: #F8F4EC !important; }
-.dark .glass .hover\:text-plum:hover { color: #C6A15B !important; }
-/* Alternate / filter pills — unselected are subtle dark (via .bg-white rule above), selected must STAND OUT */
-.dark .rounded-full.bg-midnight,
-.dark a.rounded-full.bg-midnight,
-.dark .rounded-full.bg-midnight.text-white,
-.dark a[class*=\"rounded-full\"][class*=\"bg-midnight\"] {
-  background-color: #C6A15B !important;
-  color: #10182B !important;
-  border-color: rgba(198,161,91,0.55) !important;
-  box-shadow: 0 0 14px rgba(198,161,91,0.35), 0 2px 8px rgba(0,0,0,0.25) !important;
-  font-weight: 600;
-}
-.dark .rounded-full.bg-emeraldDeep,
-.dark a.rounded-full.bg-emeraldDeep {
-  box-shadow: 0 0 10px rgba(20,84,71,0.4) !important;
-  border-color: rgba(52,211,153,0.35) !important;
-}
-/* Selected draft amber pill — enhance contrast */
-.dark .rounded-full.bg-amber-100 { background-color: rgba(251,191,36,0.22) !important; color: #fef3c7 !important; border-color: rgba(251,191,36,0.35) !important; box-shadow: 0 0 10px rgba(251,191,36,0.2) !important; }
-/* View-all / outline buttons that were bg-white — already mapped to 0.06, add hover highlight */
-.dark a.border.bg-white:hover, .dark button.border.bg-white:hover { background-color: rgba(255,255,255,0.10) !important; border-color: rgba(255,255,255,0.18) !important; }
-/* Nested row surfaces: .border.rounded-xl.p-3.bg-white inside a Card should be one step lighter than Card */
-.dark .rounded-xl.bg-white.p-3, .dark .rounded-xl.bg-white.p-4, .dark .border.bg-white.rounded-xl { background-color: rgba(255,255,255,0.05) !important; }
-/* Ensure muted text inside dark surfaces stays legible */
-.dark .bg-white .text-muted-foreground, .dark .bg-white\/90 .text-muted-foreground { color: rgba(248,244,236,0.62) !important; }
+/* Tables */
+.dark table { background-color: #292929 !important; color: #F5F3EF !important; }
+.dark thead { background-color: #242424 !important; border-color: #3A3936 !important; }
+.dark thead th { color: #B8B5AE !important; border-color: #3A3936 !important; }
+.dark tbody tr { border-color: #3A3936 !important; }
+.dark tbody tr:hover { background-color: #303030 !important; }
+.dark tbody td { border-color: #3A3936 !important; color: #F5F3EF !important; }
+.dark .border-b { border-color: #3A3936 !important; }
+
+/* Cards — ensure elevation hierarchy */
+.dark .bg-card { background-color: #292929 !important; border-color: #3A3936 !important; color: #F5F3EF !important; }
+.dark [class*="shadow-card"], .dark [class*="shadow-soft"] { box-shadow: 0 4px 16px rgba(0,0,0,0.45) !important; }
+
+/* Badges — orange primary, gold secondary already handled via component but ensure contrast */
+.dark .bg-champagne.text-midnight { background-color: #303030 !important; color: #F5F3EF !important; }
+
+/* Pagination & dropdowns */
+.dark [role="dialog"], .dark [data-radix-popper-content-wrapper] { background-color: #292929 !important; border-color: #3A3936 !important; }
+
+/* Charts — gridlines, axis labels, tooltips */
+.dark .recharts-cartesian-grid line { stroke: #3A3936 !important; }
+.dark .recharts-text, .dark .recharts-label { fill: #B8B5AE !important; }
+.dark .recharts-tooltip-wrapper { background: #303030 !important; border: 1px solid #3A3936 !important; color: #F5F3EF !important; }
+
+/* Scrollbar — subtle dark */
+.dark ::-webkit-scrollbar { width: 8px; height: 8px; }
+.dark ::-webkit-scrollbar-track { background: #191919; }
+.dark ::-webkit-scrollbar-thumb { background: #3A3936; border-radius: 999px; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #4A4946; }
+html.dark { scrollbar-color: #3A3936 #191919; }
+
+/* Empty states, alerts, skeletons */
+.dark .bg-yellow-50, .dark .bg-blue-50, .dark .bg-red-50, .dark .bg-green-50 { background-color: #242424 !important; border-color: #3A3936 !important; }
+.dark .animate-pulse { background-color: #2A2A2A !important; }
+
+/* Mobile drawer — already bg-midnight, ensure overlay */
+.dark .fixed.inset-0.bg-black\/40, .dark .fixed.inset-0.bg-black\/50 { background-color: rgba(0,0,0,0.65) !important; }
