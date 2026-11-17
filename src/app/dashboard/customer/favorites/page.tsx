@@ -1,4 +1,3 @@
-import { AdvancedCustomerShell } from "@/components/dashboard/AdvancedCustomerShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/rbac";
@@ -20,7 +19,6 @@ export default async function CustomerFavorites(){
     favs = favRows.map((f:any)=>({ ...f, design: f.designId? dMap.get(f.designId): null, product: f.productId? pMap.get(f.productId): null }));
   } catch{}
   return (
-    <AdvancedCustomerShell title="Favorites">
       <div className="space-y-6 max-w-4xl">
         <h1 className="font-display text-2xl">Favorites — {favs.length}</h1>
         <Card><CardHeader><CardTitle className="text-sm">Saved designs & fabrics — tap to view</CardTitle></CardHeader><CardContent className="space-y-2">{favs.length===0 ? <div className="p-8 text-center text-sm text-muted-foreground border rounded-xl bg-white">No favorites yet — browse <Link href="/dashboard/customer/designs" className="underline">Designs</Link> or <Link href="/dashboard/customer/marketplace" className="underline">Marketplace</Link> and heart items.</div>
@@ -29,6 +27,5 @@ export default async function CustomerFavorites(){
             <span className="text-xs text-muted-foreground">{new Date(f.createdAt).toLocaleDateString()} {f.design && <Link href={`/designs/${f.design.slug}`} className="underline ml-2">View →</Link>} {f.product && <Link href={`/fabrics/${f.product.slug}`} className="underline ml-2">View →</Link>}</span>
           </div>)}</CardContent></Card>
       </div>
-    </AdvancedCustomerShell>
-  );
+    )
 }

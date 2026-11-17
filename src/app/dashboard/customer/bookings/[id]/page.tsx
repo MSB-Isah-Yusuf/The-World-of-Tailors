@@ -1,4 +1,3 @@
-import { AdvancedCustomerShell } from "@/components/dashboard/AdvancedCustomerShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { prisma } from "@/lib/prisma";
@@ -13,9 +12,8 @@ export default async function BookingDetail({ params }: { params: Promise<{ id: 
   try {
     b = await prisma.tailoringBooking.findUnique({ where: { id }, include: { tailor: { select: { businessName: true, slug: true } }, design: { select: { title: true, slug: true } }, statusHistory: { orderBy: { createdAt: "asc" } }, notes: { orderBy: { createdAt: "desc" }, take: 5 } } });
   } catch {}
-  if (!b || b.customerId !== uid) return <AdvancedCustomerShell title="Booking"><div className="p-8 text-sm dark:text-ivory">Booking not found or not yours.</div></AdvancedCustomerShell>;
+  if (!b || b.customerId !== uid) return (<div className="p-8 text-sm dark:text-ivory">Booking not found or not yours.</div>)
   return (
-    <AdvancedCustomerShell title="Booking Details">
       <div className="space-y-6 max-w-4xl">
         <div className="flex justify-between"><div><h1 className="font-display text-2xl dark:text-ivory">{b.reference} • {b.tailor?.businessName}</h1><p className="text-sm text-muted-foreground dark:text-ivory/60">Tailor: <Link href={`/tailors/${b.tailor?.slug}`} className="underline dark:text-gold">{b.tailor?.businessName}</Link> • Design: {b.design?.title||"Bespoke"} • Snapshot frozen at request</p></div><Badge variant={b.status==="COMPLETED"?"success":b.status==="REQUESTED"?"warning":"secondary"}>{b.status} • {b.paymentStatus}</Badge></div>
         <div className="grid md:grid-cols-3 gap-4">
@@ -27,6 +25,5 @@ export default async function BookingDetail({ params }: { params: Promise<{ id: 
         <Card className="dark:bg-white/[0.04] dark:border-white/10"><CardHeader><CardTitle className="text-sm dark:text-ivory">Description</CardTitle></CardHeader><CardContent className="text-sm dark:text-ivory/80">{b.description||"—"}</CardContent></Card>
         <Link href="/dashboard/customer/bookings" className="text-sm underline dark:text-gold">← Back to bookings</Link>
       </div>
-    </AdvancedCustomerShell>
-  );
+    )
 }

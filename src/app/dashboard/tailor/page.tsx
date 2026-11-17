@@ -1,4 +1,3 @@
-import { DashboardShell } from "@/components/dashboard/shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,18 +10,8 @@ export default async function TailorDashboard() {
   const userId = (session.user as any).id;
   const profile = await prisma.tailorProfile.findUnique({ where: { userId } });
   if (!profile) {
-    return (
-      <DashboardShell role="TAILOR" title="Tailor Business" nav={[
-        { href: "/dashboard/tailor", label: "Overview" },
-        { href: "/dashboard/tailor/customers", label: "Customers" },
-        { href: "/dashboard/tailor/bookings", label: "Bookings" },
-        { href: "/dashboard/tailor/production", label: "Production Tracking" },
-        { href: "/dashboard/tailor/designs", label: "Design Portfolio" },
-        { href: "/dashboard/tailor/profile", label: "Profile & Settings" },
-      ]}>
-        <Card><CardHeader><CardTitle>Complete your tailor profile</CardTitle></CardHeader><CardContent className="text-sm">No TailorProfile yet. Contact admin or <Link href="/register/tailor" className="underline">re-register</Link>.</CardContent></Card>
-      </DashboardShell>
-    );
+    return (        <Card><CardHeader><CardTitle>Complete your tailor profile</CardTitle></CardHeader><CardContent className="text-sm">No TailorProfile yet. Contact admin or <Link href="/register/tailor" className="underline">re-register</Link>.</CardContent></Card>
+      )
   }
 
   // Ownership-scoped stats — safe fallback if DB unreachable
@@ -56,9 +45,7 @@ export default async function TailorDashboard() {
     { href: "/dashboard/tailor/profile", label: "Profile & Settings" },
   ];
 
-  return (
-    <DashboardShell role="TAILOR" title="Tailor Business" nav={nav}>
-      <div className="space-y-6">
+  return (      <div className="space-y-6">
         <div className="flex flex-wrap justify-between gap-3">
           <div>
             <h1 className="font-display text-2xl">Tailor Overview — {profile.businessName}</h1>
@@ -90,6 +77,5 @@ export default async function TailorDashboard() {
 
         <Card><CardHeader><CardTitle className="text-base">Measurement snapshots per booking</CardTitle></CardHeader><CardContent className="text-sm text-muted-foreground">Measurements are associated to customer + authorized booking. Reusable profiles allowed; historical snapshots preserved so profile edits don't alter old jobs. Units stored explicitly (cm/in). Access controlled at DB query level — sellers have no access.</CardContent></Card>
       </div>
-    </DashboardShell>
-  );
+    )
 }

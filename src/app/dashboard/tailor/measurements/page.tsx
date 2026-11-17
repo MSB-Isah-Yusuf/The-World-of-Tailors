@@ -1,4 +1,3 @@
-import { AdvancedTailorShell } from "@/components/dashboard/AdvancedShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +9,7 @@ export default async function MeasurementsDashboard({ searchParams }: { searchPa
   const sp = await searchParams;
   const session = await requireRole(["TAILOR"]);
   const profile = await prisma.tailorProfile.findUnique({ where:{ userId: (session.user as any).id } });
-  if (!profile) return <AdvancedTailorShell title="Measurements"><div className="p-6 text-sm">No tailor profile.</div></AdvancedTailorShell>;
+  if (!profile) return (<div className="p-6 text-sm">No tailor profile.</div>)
 
   const q = sp?.q?.toLowerCase()?.trim() || "";
   const type = sp?.type || "all"; // all | registered | walkin
@@ -39,7 +38,6 @@ export default async function MeasurementsDashboard({ searchParams }: { searchPa
   } catch { profiles=[]; }
 
   return (
-    <AdvancedTailorShell title="Customer Measurements">
       <div className="space-y-6">
         <div className="flex flex-wrap justify-between gap-4">
           <div>
@@ -93,6 +91,5 @@ export default async function MeasurementsDashboard({ searchParams }: { searchPa
 
         <div className="text-xs text-muted-foreground">Walk-in records are <strong>private to you</strong> (tailorId scoped, phone unique per tailor, never in public search). Registered customers are linked via booking authorization. Snapshots are frozen on booking so later edits don't alter old orders.</div>
       </div>
-    </AdvancedTailorShell>
-  );
+    )
 }

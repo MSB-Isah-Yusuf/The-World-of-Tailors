@@ -1,4 +1,3 @@
-import { AdvancedSellerShell } from "@/components/dashboard/AdvancedSellerShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { prisma } from "@/lib/prisma";
@@ -10,7 +9,6 @@ export default async function SellerCategories() {
   const cats: any[] = await prisma.fabricCategory.findMany({ orderBy: { name: "asc" } }).catch(()=>[]);
   const counts = await Promise.all(cats.map(async c => ({ cat: c, count: await prisma.fabricProduct.count({ where: { categoryId: c.id } }).catch(()=>0) })));
   return (
-    <AdvancedSellerShell title="Categories">
       <div className="space-y-6 max-w-3xl">
         <div><h1 className="font-display text-2xl">Product Categories</h1><p className="text-sm text-muted-foreground">Browse fabric categories • Your products per category • Admin manages master list</p></div>
         <Card><CardHeader><CardTitle className="text-sm">Categories • {cats.length} • Assign at product create</CardTitle></CardHeader>
@@ -20,6 +18,5 @@ export default async function SellerCategories() {
             <div className="text-xs text-muted-foreground">Categories are platform-wide (admin Platform Settings). Sellers select at Add New Product.</div>
           </CardContent></Card>
       </div>
-    </AdvancedSellerShell>
-  );
+    )
 }

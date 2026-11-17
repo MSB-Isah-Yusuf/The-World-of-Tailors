@@ -1,4 +1,3 @@
-import { AdvancedTailorShell } from "@/components/dashboard/AdvancedShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +12,7 @@ export default async function MeasurementDetailPage({ params, searchParams }: { 
   const { id } = await params;
   const session = await requireRole(["TAILOR"]);
   const profile = await prisma.tailorProfile.findUnique({ where:{ userId: (session.user as any).id } });
-  if (!profile) return <AdvancedTailorShell title="Measurement"><div className="p-6">No profile</div></AdvancedTailorShell>;
+  if (!profile) return (<div className="p-6">No profile</div>)
   let mp:any=null;
   try {
     mp = await prisma.measurementProfile.findUnique({ where:{ id }, include:{ values:true, user:{select:{name:true,email:true}}, tailorCustomer:{select:{fullName:true,phone:true}} } });
@@ -21,12 +20,11 @@ export default async function MeasurementDetailPage({ params, searchParams }: { 
   if (!mp || (mp.tailorId !== profile.id && mp.userId !== (session.user as any).id)) {
     if (mp?.tailorCustomerId) {
       const tc = await prisma.tailorCustomer.findUnique({ where:{ id: mp.tailorCustomerId } });
-      if (!tc || tc.tailorId !== profile.id) return <AdvancedTailorShell title="Measurement"><Card><CardContent className="p-6 text-sm">FORBIDDEN: not your measurement record.</CardContent></Card></AdvancedTailorShell>;
-    } else return <AdvancedTailorShell title="Measurement"><Card><CardContent className="p-6 text-sm">Measurement not found.</CardContent></Card></AdvancedTailorShell>;
+      if (!tc || tc.tailorId !== profile.id) return (<Card><CardContent className="p-6 text-sm">FORBIDDEN: not your measurement record.</CardContent></Card>)
+    } else return (<Card><CardContent className="p-6 text-sm">Measurement not found.</CardContent></Card>)
   }
   const displayName = mp.tailorCustomer?.fullName || mp.user?.name || mp.name;
   return (
-    <AdvancedTailorShell title={`Measurements — ${displayName}`}>
       <div className="space-y-6">
         <div className="flex flex-wrap justify-between gap-3">
           <div><h1 className="font-display text-2xl">{displayName} • {mp.garmentType}</h1><p className="text-sm text-muted-foreground">{mp.bodyTemplate} • {mp.unit} • Status {mp.status} • Updated {new Date(mp.updatedAt).toLocaleString()}</p></div>
@@ -38,6 +36,5 @@ export default async function MeasurementDetailPage({ params, searchParams }: { 
           <MeasurementDetailActions id={mp.id} />
         </CardContent></Card>
       </div>
-    </AdvancedTailorShell>
-  );
+    )
 }

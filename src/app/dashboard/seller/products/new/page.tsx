@@ -1,4 +1,3 @@
-import { AdvancedSellerShell } from "@/components/dashboard/AdvancedSellerShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,7 +36,6 @@ export default async function NewProductPage() {
   await requireRole(["FABRIC_SELLER"]);
   const cats: any[] = await prisma.fabricCategory.findMany({ orderBy: { name: "asc" } }).catch(()=>[]);
   return (
-    <AdvancedSellerShell title="Add New Product">
       <div className="space-y-6 max-w-3xl">
         <div><h1 className="font-display text-2xl">Add New Product</h1><p className="text-sm text-muted-foreground">Units per yard/metre/piece/roll/bundle • Visible throughout marketplace • Draft until published</p></div>
         <Card><CardHeader><CardTitle className="text-sm">Product details • publish after verification</CardTitle></CardHeader><CardContent>
@@ -56,6 +54,5 @@ export default async function NewProductPage() {
           </form>
         </CardContent></Card>
       </div>
-    </AdvancedSellerShell>
-  );
+    )
 }

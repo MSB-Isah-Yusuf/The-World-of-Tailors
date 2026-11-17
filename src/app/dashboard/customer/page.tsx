@@ -1,4 +1,3 @@
-import { AdvancedCustomerShell } from "@/components/dashboard/AdvancedCustomerShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -21,7 +20,6 @@ export default async function CustomerDashboard() {
     recentBookings= await prisma.tailoringBooking.findMany({ where:{ customerId: userId }, include:{ tailor:{ select:{ businessName:true, slug:true } }, design:{ select:{ title:true } } }, orderBy:{ updatedAt:"desc" }, take:4 });
   } catch {}
   return (
-    <AdvancedCustomerShell title="Overview">
       <div className="space-y-6">
         <div><h1 className="font-display text-2xl">Welcome back, {(session.user as any).name||"valued customer"}</h1><p className="text-sm text-muted-foreground">Track bookings • view measurements (read-only, tailor-owned) • purchase fabrics • choose tailor delivery destination</p></div>
         <div className="grid md:grid-cols-4 gap-4">
@@ -38,6 +36,5 @@ export default async function CustomerDashboard() {
           </CardContent></Card>
         <Card><CardHeader><CardTitle className="text-base">Measurements — view only (tailor records)</CardTitle></CardHeader><CardContent className="text-sm text-muted-foreground">Tailors record your measurements with your consent via the interactive mannequin. You can view snapshots per booking at <Link href="/dashboard/customer/measurements" className="underline">Measurements →</Link> but cannot edit tailor-owned walk-in records. Your own profile measurements are stored securely and never exposed in URLs.</CardContent></Card>
       </div>
-    </AdvancedCustomerShell>
-  );
+    )
 }

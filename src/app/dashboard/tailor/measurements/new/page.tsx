@@ -1,4 +1,3 @@
-import { AdvancedTailorShell } from "@/components/dashboard/AdvancedShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,7 +34,6 @@ async function createWalkIn(formData: FormData){
 export default async function NewWalkInPage({ searchParams }: { searchParams: Promise<{ error?:string }> }) {
   const sp = await searchParams;
   return (
-    <AdvancedTailorShell title="Add Walk-in Customer">
       <div className="max-w-2xl space-y-6">
         <div><h1 className="font-display text-2xl">+ Add Walk-in Customer</h1><p className="text-sm text-muted-foreground">Private to you — no TWT account required. You can invite them to join later via phone/email verification. Records never merge on name alone.</p></div>
         {sp?.error==="Missing" && <div className="rounded-xl border border-burgundy/20 bg-burgundy/10 px-3 py-2 text-sm text-burgundy">Full name and phone are required.</div>}
@@ -58,6 +56,5 @@ export default async function NewWalkInPage({ searchParams }: { searchParams: Pr
           </CardContent>
         </Card>
       </div>
-    </AdvancedTailorShell>
-  );
+    )
 }

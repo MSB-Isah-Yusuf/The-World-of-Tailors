@@ -1,4 +1,3 @@
-import { AdvancedTailorShell } from "@/components/dashboard/AdvancedShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,11 +23,10 @@ async function markCompleted(formData: FormData) {
 export default async function ReadyPage() {
   const session = await requireRole(["TAILOR"]);
   const profile: any = await prisma.tailorProfile.findUnique({ where: { userId: (session.user as any).id } });
-  if (!profile) return <AdvancedTailorShell title="Ready"><div className="p-6">No profile</div></AdvancedTailorShell>;
+  if (!profile) return (<div className="p-6">No profile</div>)
   let ready: any[] = [];
   try { ready = await prisma.tailoringBooking.findMany({ where: { tailorId: profile.id, status: "READY" as any }, include: { customer: { select: { name: true } }, design: { select: { title: true } } }, orderBy: { updatedAt: "desc" } }); } catch { ready = []; }
   return (
-    <AdvancedTailorShell title="Ready for Collection">
       <div className="space-y-6">
         <div><h1 className="font-display text-2xl">Ready for Collection</h1><p className="text-sm text-muted-foreground">Garments finished • Notify customer • Handover → Completed</p></div>
         <Card><CardHeader><CardTitle className="text-sm">Ready • {ready.length} — notify customer, mark collected</CardTitle></CardHeader>
@@ -41,6 +39,5 @@ export default async function ReadyPage() {
             </div>)}
           </CardContent></Card>
       </div>
-    </AdvancedTailorShell>
-  );
+    )
 }

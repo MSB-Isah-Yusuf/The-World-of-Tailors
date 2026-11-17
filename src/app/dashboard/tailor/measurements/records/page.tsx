@@ -1,4 +1,3 @@
-import { AdvancedTailorShell } from "@/components/dashboard/AdvancedShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { prisma } from "@/lib/prisma";
@@ -9,7 +8,7 @@ export default async function RecordsPage() {
   await requireRole(["TAILOR"]);
   const session = await (await import("@/lib/auth")).auth();
   const profile: any = await prisma.tailorProfile.findUnique({ where: { userId: (session as any).user.id } });
-  if (!profile) return <AdvancedTailorShell title="Measurement Records"><div className="p-6">No profile</div></AdvancedTailorShell>;
+  if (!profile) return (<div className="p-6">No profile</div>)
   let histories: any[] = [];
   let profiles: any[] = [];
   try {
@@ -18,7 +17,6 @@ export default async function RecordsPage() {
     if (ids.length) histories = await prisma.measurementHistory.findMany({ where: { profileId: { in: ids } }, orderBy: { createdAt: "desc" }, take: 20, include: { profile: { select: { name: true, garmentType: true } } } });
   } catch { histories = []; }
   return (
-    <AdvancedTailorShell title="Measurement Records">
       <div className="space-y-6">
         <div><h1 className="font-display text-2xl">Measurement Records • History</h1><p className="text-sm text-muted-foreground">Immutable audit • Per-customer timeline • Before→after JSON • Snapshot linked to booking</p></div>
         <div className="grid md:grid-cols-3 gap-4 text-xs">
@@ -37,6 +35,5 @@ export default async function RecordsPage() {
           </CardContent></Card>
         <Card><CardContent className="text-xs text-muted-foreground p-4">Privacy: seller has no access • History is immutable • Export JSON at /api/tailor/measurements/{'{id}'}/export • Duplicate at mannequin duplicate button.</CardContent></Card>
       </div>
-    </AdvancedTailorShell>
-  );
+    )
 }

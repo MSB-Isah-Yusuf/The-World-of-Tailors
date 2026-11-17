@@ -1,4 +1,3 @@
-import { AdvancedSellerShell } from "@/components/dashboard/AdvancedSellerShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/rbac";
@@ -13,7 +12,6 @@ export default async function InventoryPage(){
     movements= await prisma.inventoryMovement.findMany({ where:{ productId:{ in: ids } }, orderBy:{ createdAt:"desc" }, take:20 });
   } catch {}
   return (
-    <AdvancedSellerShell title="Inventory">
       <div className="space-y-6">
         <div><h1 className="font-display text-2xl">Inventory — {profile?.businessName}</h1><p className="text-sm text-muted-foreground">Atomic stock + reserved vs available • Movement history • No direct edits without audit</p></div>
         <div className="grid lg:grid-cols-2 gap-6">
@@ -23,6 +21,5 @@ export default async function InventoryPage(){
           <Card><CardHeader><CardTitle className="text-base">Recent movements • Audit</CardTitle></CardHeader><CardContent className="space-y-2">{movements.length===0 ? <div className="rounded-xl border bg-white p-6 text-center text-sm text-muted-foreground">No movements yet — stock changes create InventoryMovement</div> : movements.map((m:any)=><div key={m.id} className="flex justify-between border rounded-xl p-3 bg-white text-xs"><span>{m.productId.slice(0,6)} • {m.delta>0?"+":""}{m.delta} • {m.reason}</span><span className="text-muted-foreground">{new Date(m.createdAt).toLocaleString()}</span></div>)}<div className="text-xs text-muted-foreground">Use <Link href="/dashboard/seller/products" className="underline">Products</Link> to adjust stock via movements, not direct edit.</div></CardContent></Card>
         </div>
       </div>
-    </AdvancedSellerShell>
-  );
+    )
 }

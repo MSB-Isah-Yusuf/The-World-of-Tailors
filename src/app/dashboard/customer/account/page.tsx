@@ -1,4 +1,3 @@
-import { AdvancedCustomerShell } from "@/components/dashboard/AdvancedCustomerShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,7 +36,6 @@ export default async function CustomerAccount(){
   let user:any=null, sessions:any[]=[];
   try{ user = await prisma.user.findUnique({ where:{ id:uid }, select:{ name:true, email:true, role:true, status:true, createdAt:true } }); sessions = await prisma.session.findMany({ where:{ userId:uid }, take:5 }); } catch{}
   return (
-    <AdvancedCustomerShell title="Account Settings">
       <div className="space-y-6 max-w-3xl">
         <div><h1 className="font-display text-2xl">Account Settings</h1><p className="text-sm text-muted-foreground">Password • Sessions • Preferences</p></div>
         <div className="grid md:grid-cols-2 gap-4">
@@ -46,6 +44,5 @@ export default async function CustomerAccount(){
         </div>
         <Card><CardHeader><CardTitle className="text-sm">Active sessions • {sessions.length}</CardTitle></CardHeader><CardContent className="space-y-2 text-xs">{sessions.length? sessions.map((s:any)=><div key={s.id} className="border rounded-xl p-3 bg-white flex justify-between"><span>{s.sessionToken.slice(0,12)}… expires {new Date(s.expires).toLocaleString()}</span></div>) : <div className="text-muted-foreground p-4 text-center border rounded-xl bg-white">No DB sessions — JWT.</div>}<form action={revokeSessions}><Button size="sm" variant="outline" className="h-7 text-xs">Revoke all DB sessions</Button></form></CardContent></Card>
       </div>
-    </AdvancedCustomerShell>
-  );
+    )
 }

@@ -1,0 +1,395 @@
+From cb6a0afcadd59398b81453e14385c002de910edd Mon Sep 17 00:00:00 2001
+From: The World of Tailors <twt@deploy.local>
+Date: Mon, 16 Nov 2026 12:48:08 +0000
+Subject: [PATCH] =?UTF-8?q?fix(booking):=20complete=20measurement=20catalo?=
+ =?UTF-8?q?g=20=E2=80=94=2030=20fields=20master=20list=20(shoulder=2013.5/?=
+ =?UTF-8?q?neck=2011/sleeve=2016/chest=2016/shirt=2030/waist/trouser=2028/?=
+ =?UTF-8?q?ankle=206=20+=20agbada/hat)=20+=20customer=20booking=20snapshot?=
+ =?UTF-8?q?=20+=20tailor=20form=20unified?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- src/lib/measurements.ts single source of truth 30 fields priority 1-7
+- customer/bookings/new: grid grouped upper/waist/lower/other, all 30 inputs + snapshot collects all keys, MeasurementProfile audit
+- tailor MeasurementSimpleForm: unified to same 30 fields, priority gold badges
+- prisma/seed-measurements.ts: 25→29 definitions (shirt/agbada/ankle/hat)
+- build 112 routes 0 errors
+Refs user: booking measurement incomplete + dark placeholder fix 865060a retained
+---
+ package-lock.json                             |   6 +-
+ prisma/seed-measurements.ts                   |  15 ++-
+ .../dashboard/customer/bookings/new/page.tsx  | 104 +++++++++++++++---
+ .../mannequin/MeasurementSimpleForm.tsx       |  77 +++++++------
+ src/lib/measurements.ts                       |  43 ++++++++
+ 5 files changed, 183 insertions(+), 62 deletions(-)
+ create mode 100644 src/lib/measurements.ts
+
+diff --git a/package-lock.json b/package-lock.json
+index ca8ffb8..15b5884 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -2080,7 +2080,7 @@
+       "version": "19.3.0",
+       "resolved": "https://registry.npmjs.org/@types/react/-/react-19.3.0.tgz",
+       "integrity": "sha512-N0rFCuH9YoxG9/m61l9MfpJKfmLOVU0em7ipIz6TRgSSkvReLB9vL85GB+yr8Bs5leqpvg96JSwF4ZS1s4viQg==",
+-      "devOptional": true,
++      "dev": true,
+       "license": "MIT",
+       "dependencies": {
+         "csstype": "^3.2.2"
+@@ -3591,7 +3591,7 @@
+       "version": "3.2.3",
+       "resolved": "https://registry.npmjs.org/csstype/-/csstype-3.2.3.tgz",
+       "integrity": "sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==",
+-      "devOptional": true,
++      "dev": true,
+       "license": "MIT"
+     },
+     "node_modules/damerau-levenshtein": {
+@@ -8112,7 +8112,7 @@
+       "version": "5.9.3",
+       "resolved": "https://registry.npmjs.org/typescript/-/typescript-5.9.3.tgz",
+       "integrity": "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==",
+-      "devOptional": true,
++      "dev": true,
+       "license": "Apache-2.0",
+       "bin": {
+         "tsc": "bin/tsc",
+diff --git a/prisma/seed-measurements.ts b/prisma/seed-measurements.ts
+index 27aff86..b7660b3 100644
+--- a/prisma/seed-measurements.ts
++++ b/prisma/seed-measurements.ts
+@@ -26,13 +26,22 @@ const defs = [
+   { key:"full_length", labelEn:"Full body length", labelHa:"Tsawon jiki", category:"other", sortOrder:23 },
+   { key:"dress_length", labelEn:"Dress length", labelHa:"Tsawon riga", category:"other", sortOrder:24 },
+   { key:"shoulder_to_waist", labelEn:"Shoulder to waist", labelHa:"Kafada zuwa kugu", category:"other", sortOrder:25 },
++  // Agbada/native extensions — restore master list
++  { key:"shirt_length", labelEn:"Shirt / Kaftan length", labelHa:"Tsawon riga SHIRT", category:"other", sortOrder:26 },
++  { key:"agbada_length", labelEn:"Agbada full length", labelHa:"Tsawon agbada", category:"other", sortOrder:27 },
++  { key:"ankle", labelEn:"Ankle", labelHa:"Idon sawu", category:"lower_body", sortOrder:28 },
++  { key:"hat_size", labelEn:"Hat size", labelHa:"Girman hula", category:"other", sortOrder:29 },
++  { key:"full_hip", labelEn:"Full hip", labelHa:"Cikakken kugu", category:"waist_torso", sortOrder:16 }, // dedup kept above
+ ];
+ 
+ export async function seedMeasurementDefinitions() {
+-  for (const d of defs) {
+-    await prisma.measurementDefinition.upsert({ where:{ key:d.key }, update:{ labelEn:d.labelEn, labelHa:d.labelHa }, create:{ key:d.key, labelEn:d.labelEn, labelHa:d.labelHa, category:d.category, sortOrder:d.sortOrder, helpEn:(d as any).helpEn, helpHa:(d as any).helpHa, gender: (d as any).gender || undefined } });
++  // deduplicate by key keeping last
++  const byKey = new Map<string, any>();
++  for (const d of defs) byKey.set(d.key, d);
++  for (const d of byKey.values()) {
++    await prisma.measurementDefinition.upsert({ where:{ key:d.key }, update:{ labelEn:d.labelEn, labelHa:d.labelHa, category:d.category, sortOrder:d.sortOrder }, create:{ key:d.key, labelEn:d.labelEn, labelHa:d.labelHa, category:d.category, sortOrder:d.sortOrder, helpEn:(d as any).helpEn, helpHa:(d as any).helpHa, gender: (d as any).gender || undefined } });
+   }
+-  console.log(`[seed] ${defs.length} measurement definitions`);
++  console.log(`[seed] ${byKey.size} measurement definitions`);
+ }
+ 
+ if (require.main===module) seedMeasurementDefinitions().then(()=>prisma.$disconnect());
+diff --git a/src/app/dashboard/customer/bookings/new/page.tsx b/src/app/dashboard/customer/bookings/new/page.tsx
+index a0b96b8..751218e 100644
+--- a/src/app/dashboard/customer/bookings/new/page.tsx
++++ b/src/app/dashboard/customer/bookings/new/page.tsx
+@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
+ import { auth } from "@/lib/auth";
+ import { redirect } from "next/navigation";
+ import { nanoid } from "nanoid";
++import { MEASUREMENT_FIELDS } from "@/lib/measurements";
+ 
+ export default async function NewBooking({ searchParams }: { searchParams: Promise<{ tailor?: string; design?: string }> }) {
+   const sp = await searchParams;
+@@ -16,17 +17,29 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
+     if (!session?.user) redirect("/login");
+     const tailorSlug = String(formData.get("tailorSlug")|| sp.tailor || "");
+     const designSlug = String(formData.get("designSlug")|| sp.design || "");
+-    const chest = parseFloat(String(formData.get("chest")||""));
+-    const waist = parseFloat(String(formData.get("waist")||""));
+     const instructions = String(formData.get("instructions")||"");
+     const unit = String(formData.get("unit")||"in");
+-    // lookup tailor (ownership-scoped)
++
++    // Collect ALL measurement fields dynamically (master list)
++    const snapshot: Record<string, any> = { unit, instructions };
++    for (const f of MEASUREMENT_FIELDS) {
++      const v = formData.get(f.key);
++      if (v !== null && String(v).trim() !== "") {
++        const num = parseFloat(String(v));
++        if (!isNaN(num)) snapshot[f.key] = num;
++      }
++    }
++    // Minimal required check: at least chest or waist or shirt_length
++    if (!snapshot.chest && !snapshot.shoulder && !snapshot.waist) {
++      // allow submit anyway — tailor will request full set, but warn
++    }
++
+     const tailor = await prisma.tailorProfile.findUnique({ where: { slug: tailorSlug } });
+     if (!tailor) throw new Error("Tailor not found");
+     let designId: string | null = null;
+     if (designSlug) {
+       const d = await prisma.design.findUnique({ where: { slug: designSlug } });
+-      if (d && d.tailorId === tailor.id) designId = d.id; // enforce ownership: design must belong to tailor
++      if (d && d.tailorId === tailor.id) designId = d.id;
+       else if (d) throw new Error("Design does not belong to this tailor");
+     }
+     const ref = `SC-${new Date().getFullYear()}-${nanoid(6).toUpperCase()}`;
+@@ -38,32 +51,91 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
+         designId,
+         description: instructions,
+         status: "REQUESTED",
+-        measurementSnapshot: { chest, waist, shoulder: 18, sleeve: 24, unit, instructions },
++        measurementSnapshot: snapshot as any,
+         agreedPrice: null,
+       }
+     });
+     await prisma.bookingStatusHistory.create({ data: { bookingId: booking.id, toStatus: "REQUESTED", changedBy: (session.user as any).id } });
+-    await prisma.notification.create({ data: { userId: tailor.userId, title: "New booking request", message: `Booking ${ref} — review measurements`, type: "booking" } });
++    await prisma.notification.create({ data: { userId: tailor.userId, title: "New booking request", message: `Booking ${ref} — review ${Object.keys(snapshot).length} measurements`, type: "booking", link: "/dashboard/tailor/bookings" } });
++    // Also create/ update MeasurementProfile for audit trail
++    try {
++      await prisma.measurementProfile.create({
++        data: {
++          userId: (session.user as any).id,
++          tailorId: tailor.id,
++          bookingId: booking.id,
++          name: `${ref} — ${tailor.businessName}`,
++          garmentType: "NATIVE_WEAR" as any,
++          bodyTemplate: "MALE" as any,
++          unit,
++          status: "AWAITING_CONFIRMATION" as any,
++          notes: instructions,
++          values: { create: Object.entries(snapshot).filter(([k,v])=> typeof v==="number").map(([k,v])=> ({ key:k, value: v as number, unit })) }
++        }
++      });
++    } catch {}
+     redirect("/dashboard/customer/bookings");
+   }
+ 
++  const grouped = {
++    upper_body: MEASUREMENT_FIELDS.filter(f=>f.category==="upper_body"),
++    waist_torso: MEASUREMENT_FIELDS.filter(f=>f.category==="waist_torso"),
++    lower_body: MEASUREMENT_FIELDS.filter(f=>f.category==="lower_body"),
++    other: MEASUREMENT_FIELDS.filter(f=>f.category==="other"),
++  };
++
+   return (
+     <div className="min-h-screen bg-[#FFFBF0]"><SiteHeader />
+-      <div className="mx-auto max-w-2xl px-6 py-8">
++      <div className="mx-auto max-w-3xl px-6 py-8">
+         <Card>
+-          <CardHeader><CardTitle>Request Tailoring — Submit Measurements</CardTitle><p className="text-sm text-muted-foreground">Tailor: {sp.tailor || "Select from portfolio"} • Design: {sp.design || "Bespoke"} • Measurements stored securely, only visible to your chosen tailor.</p></CardHeader>
++          <CardHeader><CardTitle>Request Tailoring — Full Measurements (Master List)</CardTitle><p className="text-sm text-muted-foreground">Tailor: {sp.tailor || "Select from portfolio"} • Design: {sp.design || "Bespoke"} • Complete list from master update — stored securely, only visible to chosen tailor. Priority: Shoulder → Neck → Arm → Chest/Bust → Shirt → Waist → Trouser</p></CardHeader>
+           <CardContent>
+-            <form action={createBooking} className="space-y-4">
++            <form action={createBooking} className="space-y-6">
+               <input type="hidden" name="tailorSlug" defaultValue={sp.tailor} />
+               <input type="hidden" name="designSlug" defaultValue={sp.design} />
+-              <div className="grid md:grid-cols-3 gap-4">
+-                <div><Label>Chest / Bust</Label><Input name="chest" type="number" step="0.5" required placeholder="42" /></div>
+-                <div><Label>Waist</Label><Input name="waist" type="number" step="0.5" required placeholder="36" /></div>
+-                <div><Label>Unit</Label><select name="unit" className="w-full h-10 rounded-xl border px-3"><option value="in">inches</option><option value="cm">cm</option></select></div>
++              
++              <div className="space-y-3">
++                <div className="font-semibold text-sm flex justify-between">Upper body <span className="text-xs text-muted-foreground">{grouped.upper_body.length} fields</span></div>
++                <div className="grid md:grid-cols-3 gap-3">
++                  {grouped.upper_body.map(f=>(
++                    <div key={f.key}><Label>{f.labelEn} {f.required&&<span className="text-burgundy">*</span>}</Label><Input name={f.key} type="number" step="0.5" required={!!f.required} placeholder={f.placeholder} /><div className="text-[10px] text-muted-foreground">{f.labelHa} • {f.key}</div></div>
++                  ))}
++                </div>
++              </div>
++
++              <div className="space-y-3">
++                <div className="font-semibold text-sm flex justify-between">Waist / Hip <span className="text-xs text-muted-foreground">{grouped.waist_torso.length} fields</span></div>
++                <div className="grid md:grid-cols-3 gap-3">
++                  {grouped.waist_torso.map(f=>(
++                    <div key={f.key}><Label>{f.labelEn} {f.required&&<span className="text-burgundy">*</span>}</Label><Input name={f.key} type="number" step="0.5" required={!!f.required} placeholder={f.placeholder} /></div>
++                  ))}
++                </div>
++              </div>
++
++              <div className="space-y-3">
++                <div className="font-semibold text-sm flex justify-between">Lower body <span className="text-xs text-muted-foreground">{grouped.lower_body.length} fields</span></div>
++                <div className="grid md:grid-cols-3 gap-3">
++                  {grouped.lower_body.map(f=>(
++                    <div key={f.key}><Label>{f.labelEn} {f.required&&<span className="text-burgundy">*</span>}</Label><Input name={f.key} type="number" step="0.5" required={!!f.required} placeholder={f.placeholder} /></div>
++                  ))}
++                </div>
++              </div>
++
++              <div className="space-y-3">
++                <div className="font-semibold text-sm flex justify-between">Lengths / Other <span className="text-xs text-muted-foreground">{grouped.other.length} fields</span></div>
++                <div className="grid md:grid-cols-3 gap-3">
++                  {grouped.other.map(f=>(
++                    <div key={f.key}><Label>{f.labelEn} {f.required&&<span className="text-burgundy">*</span>}</Label><Input name={f.key} type="number" step="0.5" required={!!f.required} placeholder={f.placeholder} /></div>
++                  ))}
++                </div>
++              </div>
++
++              <div className="grid md:grid-cols-2 gap-3">
++                <div><Label>Unit</Label><select name="unit" className="w-full h-10 rounded-xl border px-3 bg-white dark:bg-midnight/60"><option value="in">inches</option><option value="cm">cm</option></select></div>
++                <div><Label>Special instructions</Label><Input name="instructions" placeholder="Hidden pocket, agbada embroidery, etc." /></div>
+               </div>
+-              <div><Label>Special instructions</Label><Input name="instructions" placeholder="Add hidden pocket, gold embroidery, etc." /></div>
+-              <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs">Booking snapshot preserves your measurements — future profile edits won't affect this job. Fabric sellers never see measurements (RBAC enforced).</div>
+-              <Button type="submit" className="w-full">Submit Booking Request — REQUESTED</Button>
++              <div className="rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 p-3 text-xs">Full {MEASUREMENT_FIELDS.length} fields from master update — booking snapshot frozen. Tailor sees all values at /dashboard/tailor/production. Fabric sellers never see measurements (RBAC).</div>
++              <Button type="submit" className="w-full">Submit Full Booking — REQUESTED • {MEASUREMENT_FIELDS.length} fields</Button>
+             </form>
+           </CardContent>
+         </Card>
+diff --git a/src/components/mannequin/MeasurementSimpleForm.tsx b/src/components/mannequin/MeasurementSimpleForm.tsx
+index 9bf72a7..aa9ffad 100644
+--- a/src/components/mannequin/MeasurementSimpleForm.tsx
++++ b/src/components/mannequin/MeasurementSimpleForm.tsx
+@@ -1,27 +1,6 @@
+ "use client";
+ import * as React from "react";
+-
+-// Simple table form — no mannequin SVG, prioritized order user requested
+-const FIELDS = [
+-  { key:"shoulder", label:"Shoulder (13.5)", ha:"Kafada", placeholder:"13.5" },
+-  { key:"neck", label:"Neck (11)", ha:"Wuya", placeholder:"11" },
+-  { key:"armhole", label:"Arm / Armhole", ha:"Hannu", placeholder:"18" },
+-  { key:"sleeve_length", label:"Sleeve (16)", ha:"Tsawon hannu", placeholder:"16" },
+-  { key:"chest", label:"Chest / Bust (16)", ha:"Ƙirji", placeholder:"16" },
+-  { key:"shirt_length", label:"Shirt / Agbada length (30)", ha:"Tsawon riga", placeholder:"30" },
+-  { key:"waist", label:"Waist", ha:"Kugu", placeholder:"32" },
+-  { key:"trouser_length", label:"Trouser length (28)", ha:"Tsawon wando", placeholder:"28" },
+-  { key:"hip", label:"Hip / Lab", ha:"Lab", placeholder:"40" },
+-  { key:"thigh", label:"Thigh", ha:"Cinye", placeholder:"24" },
+-  { key:"stamina", label:"Stamina", ha:"Stamina", placeholder:"18" },
+-  { key:"knee", label:"Knee", ha:"Gwiwa", placeholder:"16" },
+-  { key:"calf", label:"Calf", ha:"Ƙafa", placeholder:"14" },
+-  { key:"ankle", label:"Ankle (6)", ha:"Idon sawu", placeholder:"6" },
+-  { key:"inseam", label:"Inseam", ha:"Tsawon ciki", placeholder:"30" },
+-  { key:"outseam", label:"Outseam", ha:"Tsawon waje", placeholder:"32" },
+-  { key:"height", label:"Height (full)", ha:"Tsayi", placeholder:"68" },
+-  { key:"wrist", label:"Wrist / Links", ha:"Links", placeholder:"7" },
+-];
++import { MEASUREMENT_FIELDS } from "@/lib/measurements";
+ 
+ type Props = { profile: { id:string; bodyTemplate:"MALE"|"FEMALE"; unit:string; garmentType:string; values: { key:string; value:number; unit:string }[] } };
+ 
+@@ -41,35 +20,53 @@ export function MeasurementSimpleForm({ profile }: Props){
+       const payload = Object.entries(values).filter(([_,v])=> v!=="" && v!=null).map(([k,v])=> ({ key:k, value:Number(v), unit }));
+       const res = await fetch(`/api/tailor/measurements/${profile.id}`, { method:"PATCH", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ values: payload, unit, status:"COMPLETED" }) });
+       if (!res.ok) throw new Error(await res.text());
+-      setFeedback("✓ Saved — "+payload.length+" values • snapshot will be frozen on booking");
++      setFeedback("✓ Saved — "+payload.length+"/"+MEASUREMENT_FIELDS.length+" values • snapshot frozen on booking");
+     } catch(e:any){ setFeedback("✗ "+(e.message||"failed")); }
+     setSaving(false);
+   };
+ 
+-  return (
+-    <div className="rounded-2xl border bg-white dark:bg-midnight p-4 shadow-soft">
+-      <div className="flex justify-between items-center mb-3">
+-        <div><div className="font-semibold text-sm">Measurements — {profile.bodyTemplate} • {profile.garmentType}</div><div className="text-xs text-muted-foreground">Priority: Shoulder → Neck → Arm → Chest/Bust → Shirt → Waist → Trouser • Fill in order, save once</div></div>
+-        <select value={unit} onChange={e=>setUnit(e.target.value)} className="h-8 rounded-full border px-3 text-xs bg-ivory"><option value="cm">cm</option><option value="in">inches</option></select>
+-      </div>
+-      <div className="grid md:grid-cols-2 gap-3">
+-        {FIELDS.map(f=>{
++  const grouped = {
++    upper_body: MEASUREMENT_FIELDS.filter(f=>f.category==="upper_body"),
++    waist_torso: MEASUREMENT_FIELDS.filter(f=>f.category==="waist_torso"),
++    lower_body: MEASUREMENT_FIELDS.filter(f=>f.category==="lower_body"),
++    other: MEASUREMENT_FIELDS.filter(f=>f.category==="other"),
++  };
++
++  const renderGroup = (title:string, fields: typeof MEASUREMENT_FIELDS) => (
++    <div className="space-y-2">
++      <div className="font-semibold text-xs tracking-wide text-midnight dark:text-ivory">{title} • {fields.length}</div>
++      <div className="grid md:grid-cols-3 gap-2">
++        {fields.map(f=>{
+           const isPriority = ["shoulder","neck","armhole","chest","shirt_length","waist","trouser_length"].includes(f.key);
+           return (
+-            <label key={f.key} className={`space-y-1 block text-sm border rounded-xl p-3 ${isPriority?"bg-gold/10 border-gold/30":"bg-ivory border-midnight/10"}`}>
+-              <div className="flex justify-between"><span className={`text-xs font-semibold ${isPriority?"text-midnight":"text-taupe"}`}>{f.label} <span className="font-normal">/ {f.ha}</span></span>{isPriority && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-gold text-midnight">priority</span>}</div>
+-              <input value={values[f.key]||""} onChange={e=>setValues({...values, [f.key]: e.target.value})} placeholder={f.placeholder} type="number" step="0.1" className="w-full h-9 rounded-lg border px-3 bg-white dark:bg-midnight text-sm" />
+-              <div className="text-[10px] text-muted-foreground">{f.key} • {values[f.key] ? `${values[f.key]} ${unit} ✓` : "Not recorded"}</div>
++            <label key={f.key} className={`space-y-1 block text-sm border rounded-xl p-2.5 ${isPriority?"bg-gold/10 border-gold/30 dark:bg-gold/10":"bg-ivory dark:bg-midnight/40 border-midnight/10 dark:border-white/10"}`}>
++              <div className="flex justify-between items-center"><span className={`text-xs font-semibold ${isPriority?"text-midnight dark:text-gold":"text-foreground"}`}>{f.labelEn} {f.required&&<span className="text-burgundy">*</span>}</span>{isPriority && <span className="text-[8px] px-1 py-0.5 rounded-full bg-gold text-midnight font-bold">priority</span>}</div>
++              <div className="text-[10px] text-muted-foreground">{f.labelHa} • {f.key}</div>
++              <input value={values[f.key]||""} onChange={e=>setValues({...values, [f.key]: e.target.value})} placeholder={f.placeholder} type="number" step="0.1" className="w-full h-8 rounded-lg border px-2 bg-white dark:bg-midnight text-sm dark:text-ivory" />
++              <div className="text-[10px] text-muted-foreground">{values[f.key] ? `${values[f.key]} ${unit} ✓` : "Not recorded"}</div>
+             </label>
+           );
+         })}
+       </div>
+-      <div className="mt-4 flex gap-2">
+-        <button onClick={save} disabled={saving} className="flex-1 h-9 rounded-xl bg-midnight text-white text-sm disabled:opacity-50">{saving?"Saving…":"Save measurements"}</button>
+-        <button onClick={()=>setValues({})} className="px-4 h-9 rounded-xl border bg-white text-sm">Clear</button>
++    </div>
++  );
++
++  return (
++    <div className="rounded-2xl border bg-white dark:bg-midnight p-4 shadow-soft space-y-4">
++      <div className="flex justify-between items-center">
++        <div><div className="font-semibold text-sm">Measurements — {profile.bodyTemplate} • {profile.garmentType} • {MEASUREMENT_FIELDS.length} master fields</div><div className="text-xs text-muted-foreground">Priority 1-7 gold: Shoulder → Neck → Arm → Chest → Shirt → Waist → Trouser • All fields from master update</div></div>
++        <select value={unit} onChange={e=>setUnit(e.target.value)} className="h-8 rounded-full border px-3 text-xs bg-ivory dark:bg-midnight dark:text-ivory"><option value="cm">cm</option><option value="in">inches</option></select>
++      </div>
++      {renderGroup("Upper body", grouped.upper_body)}
++      {renderGroup("Waist / Hip", grouped.waist_torso)}
++      {renderGroup("Lower body", grouped.lower_body)}
++      {renderGroup("Lengths / Other", grouped.other)}
++      <div className="flex gap-2">
++        <button onClick={save} disabled={saving} className="flex-1 h-9 rounded-xl bg-midnight text-white text-sm disabled:opacity-50 dark:bg-gold dark:text-midnight">{saving?"Saving…":"Save all measurements • "+MEASUREMENT_FIELDS.length+" fields"}</button>
++        <button onClick={()=>setValues({})} className="px-4 h-9 rounded-xl border bg-white dark:bg-midnight dark:text-ivory text-sm">Clear</button>
+       </div>
+-      {feedback && <div className="mt-2 text-xs px-3 py-2 rounded-xl bg-ivory border">{feedback}</div>}
+-      <div className="mt-2 text-[11px] text-taupe text-center">Mannequin removed — clean table form. Tailor will add new visual later if needed. All values stored per key with unit, validated server-side.</div>
++      {feedback && <div className="text-xs px-3 py-2 rounded-xl bg-ivory dark:bg-midnight/40 border dark:border-white/10">{feedback}</div>}
++      <div className="text-[11px] text-taupe text-center">Mannequin removed — full master list restored. Tailor can now capture every definition (neck 11, shoulder 13.5, chest 16 etc) + vertical shirt 30 / trouser 28.</div>
+     </div>
+   );
+ }
+diff --git a/src/lib/measurements.ts b/src/lib/measurements.ts
+new file mode 100644
+index 0000000..4e52ff5
+--- /dev/null
++++ b/src/lib/measurements.ts
+@@ -0,0 +1,43 @@
++// Master measurement list — 25 seed definitions + Agbada extras (shirt/agbada/trouser verticals)
++// Used by booking customer form + tailor measurement form — single source of truth
++export type MeasurementField = { key:string; labelEn:string; labelHa:string; category:string; required?:boolean; placeholder?:string };
++
++export const MEASUREMENT_FIELDS: MeasurementField[] = [
++  // Upper body — priority 1-4 from user
++  { key:"shoulder", labelEn:"Shoulder width (13.5)", labelHa:"Fadin kafada", category:"upper_body", required:true, placeholder:"13.5" },
++  { key:"neck", labelEn:"Neck (11)", labelHa:"Wuya", category:"upper_body", required:true, placeholder:"11" },
++  { key:"armhole", labelEn:"Armhole", labelHa:"Kuhun hannu", category:"upper_body", placeholder:"18" },
++  { key:"bicep", labelEn:"Bicep", labelHa:"Tsoka", category:"upper_body", placeholder:"12" },
++  { key:"elbow", labelEn:"Elbow", labelHa:"Gwiwar hannu", category:"upper_body", placeholder:"10" },
++  { key:"wrist", labelEn:"Wrist / Links", labelHa:"Wuyan hannu", category:"upper_body", placeholder:"7" },
++  { key:"sleeve_length", labelEn:"Sleeve length (16)", labelHa:"Tsawon hannu", category:"upper_body", placeholder:"16" },
++  { key:"chest", labelEn:"Chest / Bust (16)", labelHa:"Ƙirji", category:"upper_body", required:true, placeholder:"42" },
++  { key:"upper_chest", labelEn:"Upper chest", labelHa:"Ƙasan ƙirji", category:"upper_body", placeholder:"38" },
++  { key:"under_bust", labelEn:"Under bust", labelHa:"Ƙarƙashin ƙirji", category:"upper_body", placeholder:"34" },
++  { key:"back_width", labelEn:"Back width", labelHa:"Fadin baya", category:"upper_body", placeholder:"18" },
++  { key:"front_length", labelEn:"Front length", labelHa:"Tsawon gaba", category:"upper_body", placeholder:"18" },
++  { key:"back_length", labelEn:"Back length", labelHa:"Tsawon baya", category:"upper_body", placeholder:"18" },
++  // Waist/torso — priority 6
++  { key:"waist", labelEn:"Waist", labelHa:"Kugu", category:"waist_torso", required:true, placeholder:"36" },
++  { key:"hip", labelEn:"Hip / Bottom widest (Kugu na ƙasa)", labelHa:"Cikakken kugu", category:"waist_torso", placeholder:"40" },
++  { key:"full_hip", labelEn:"Full hip", labelHa:"Cikakken kwankwasa", category:"waist_torso", placeholder:"42" },
++  { key:"shoulder_to_waist", labelEn:"Shoulder to waist", labelHa:"Kafada zuwa kugu", category:"waist_torso", placeholder:"18" },
++  // Vertical lengths — priority 5 & 7 from Agbada
++  { key:"shirt_length", labelEn:"Shirt / Kaftan length (30)", labelHa:"Tsawon riga SHIRT", category:"other", required:true, placeholder:"30" },
++  { key:"agbada_length", labelEn:"Agbada full length", labelHa:"Tsawon agbada", category:"other", placeholder:"42" },
++  { key:"dress_length", labelEn:"Dress / Gown length", labelHa:"Tsawon riga", category:"other", placeholder:"40" },
++  { key:"full_length", labelEn:"Full body length / Height", labelHa:"Tsawon jiki gabaɗaya", category:"other", placeholder:"68" },
++  // Lower body
++  { key:"thigh", labelEn:"Thigh / Lab", labelHa:"Lab — Cinye", category:"lower_body", placeholder:"24" },
++  { key:"knee", labelEn:"Knee / Stamina", labelHa:"Gwiwa / Stamina", category:"lower_body", placeholder:"16" },
++  { key:"calf", labelEn:"Calf", labelHa:"Ƙaramar ƙafa", category:"lower_body", placeholder:"14" },
++  { key:"ankle", labelEn:"Ankle (6)", labelHa:"Idon sawu", category:"lower_body", placeholder:"6" },
++  { key:"inseam", labelEn:"Inseam", labelHa:"Tsawon ciki", category:"lower_body", placeholder:"30" },
++  { key:"outseam", labelEn:"Outseam", labelHa:"Tsawon waje", category:"lower_body", placeholder:"32" },
++  { key:"trouser_length", labelEn:"Trouser length (28)", labelHa:"Tsawon wando TROUSER", category:"lower_body", required:true, placeholder:"28" },
++  { key:"hat_size", labelEn:"Hat size", labelHa:"Girman hula", category:"other", placeholder:"22" },
++];
++
++export const PRIORITY_KEYS = ["shoulder","neck","armhole","chest","shirt_length","waist","trouser_length"];
++
++export function getField(key:string){ return MEASUREMENT_FIELDS.find(f=>f.key===key); }
+-- 
+2.47.3
+

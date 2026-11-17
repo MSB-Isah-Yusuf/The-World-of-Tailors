@@ -1,4 +1,3 @@
-import { DashboardShell } from "@/components/dashboard/shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/rbac";
@@ -7,7 +6,7 @@ import Link from "next/link";
 export default async function TailorCustomersPage() {
   const session = await requireRole(["TAILOR"]);
   const profile = await prisma.tailorProfile.findUnique({ where: { userId: (session.user as any).id } });
-  if (!profile) return <DashboardShell role="TAILOR" title="Tailor Business" nav={[{href:"#"} as any]}><div>No profile</div></DashboardShell>;
+  if (!profile) return (<div>No profile</div>)
   let rows:any[]=[];
   try {
     // Customers are derived from bookings — least-privilege: only those who booked you
@@ -30,9 +29,7 @@ export default async function TailorCustomersPage() {
     { href: "/dashboard/tailor/designs", label: "Design Portfolio" },
     { href: "/dashboard/tailor/profile", label: "Profile & Settings" },
   ];
-  return (
-    <DashboardShell role="TAILOR" title="Tailor Business" nav={nav}>
-      <div className="space-y-6">
+  return (      <div className="space-y-6">
         <div><h1 className="font-display text-2xl">Customers — {profile.businessName}</h1><p className="text-sm text-muted-foreground">Only customers who have booked you (ownership-scoped via <code>customerId → TailoringBooking.tailorId</code>). No platform-wide list.</p></div>
         <Card>
           <CardHeader><CardTitle className="text-base">{rows.length} customers • Authorized via bookings only</CardTitle></CardHeader>
@@ -48,6 +45,5 @@ export default async function TailorCustomersPage() {
           </CardContent>
         </Card>
       </div>
-    </DashboardShell>
-  );
+    )
 }

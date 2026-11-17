@@ -1,4 +1,3 @@
-import { AdvancedTailorShell } from "@/components/dashboard/AdvancedShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/prisma";
@@ -28,7 +27,6 @@ export default async function CalendarPage() {
     overdue = await prisma.tailoringBooking.findMany({ where: { tailorId: profile!.id, estimatedCompletion: { lt: now }, status: { in: ["ACCEPTED", "IN_PRODUCTION"] as any } }, take: 10 });
   } catch { upcoming = []; }
   return (
-    <AdvancedTailorShell title="Calendar & Availability">
       <div className="space-y-6 max-w-4xl">
         <div className="flex justify-between gap-2"><div><h1 className="font-display text-2xl">Calendar & Availability</h1><p className="text-sm text-muted-foreground">Deadlines • Blocked dates • Working hours — availability gates public ranking</p></div><form action={toggleAvailability}><Button size="sm" variant={profile?.isPublished ? "default" : "outline"} className="h-8 text-xs">{profile?.isPublished ? "Open for bookings ✓" : "Closed — not searchable"}</Button></form></div>
         <div className="grid md:grid-cols-2 gap-4">
@@ -37,6 +35,5 @@ export default async function CalendarPage() {
         </div>
         <Card><CardHeader><CardTitle className="text-sm">Availability</CardTitle></CardHeader><CardContent className="text-xs text-muted-foreground space-y-2"><div>Current: {profile?.isPublished ? "Published — searchable on /tailors" : "Unpublished — hidden"} • Business status {profile?.businessStatus}</div><div>Toggle closes storefront immediately (isPublished=false removes from public search). Working hours + blocked dates UI next iteration; overlap guard will check TailoringBooking.estimatedCompletion.</div></CardContent></Card>
       </div>
-    </AdvancedTailorShell>
-  );
+    )
 }

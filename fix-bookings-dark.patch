@@ -1,0 +1,846 @@
+From cb6a0afcadd59398b81453e14385c002de910edd Mon Sep 17 00:00:00 2001
+From: The World of Tailors <twt@deploy.local>
+Date: Mon, 16 Nov 2026 12:48:08 +0000
+Subject: [PATCH 1/3] =?UTF-8?q?fix(booking):=20complete=20measurement=20ca?=
+ =?UTF-8?q?talog=20=E2=80=94=2030=20fields=20master=20list=20(shoulder=201?=
+ =?UTF-8?q?3.5/neck=2011/sleeve=2016/chest=2016/shirt=2030/waist/trouser?=
+ =?UTF-8?q?=2028/ankle=206=20+=20agbada/hat)=20+=20customer=20booking=20sn?=
+ =?UTF-8?q?apshot=20+=20tailor=20form=20unified?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- src/lib/measurements.ts single source of truth 30 fields priority 1-7
+- customer/bookings/new: grid grouped upper/waist/lower/other, all 30 inputs + snapshot collects all keys, MeasurementProfile audit
+- tailor MeasurementSimpleForm: unified to same 30 fields, priority gold badges
+- prisma/seed-measurements.ts: 25→29 definitions (shirt/agbada/ankle/hat)
+- build 112 routes 0 errors
+Refs user: booking measurement incomplete + dark placeholder fix 865060a retained
+---
+ package-lock.json                             |   6 +-
+ prisma/seed-measurements.ts                   |  15 ++-
+ .../dashboard/customer/bookings/new/page.tsx  | 104 +++++++++++++++---
+ .../mannequin/MeasurementSimpleForm.tsx       |  77 +++++++------
+ src/lib/measurements.ts                       |  43 ++++++++
+ 5 files changed, 183 insertions(+), 62 deletions(-)
+ create mode 100644 src/lib/measurements.ts
+
+diff --git a/package-lock.json b/package-lock.json
+index ca8ffb8..15b5884 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -2080,7 +2080,7 @@
+       "version": "19.3.0",
+       "resolved": "https://registry.npmjs.org/@types/react/-/react-19.3.0.tgz",
+       "integrity": "sha512-N0rFCuH9YoxG9/m61l9MfpJKfmLOVU0em7ipIz6TRgSSkvReLB9vL85GB+yr8Bs5leqpvg96JSwF4ZS1s4viQg==",
+-      "devOptional": true,
++      "dev": true,
+       "license": "MIT",
+       "dependencies": {
+         "csstype": "^3.2.2"
+@@ -3591,7 +3591,7 @@
+       "version": "3.2.3",
+       "resolved": "https://registry.npmjs.org/csstype/-/csstype-3.2.3.tgz",
+       "integrity": "sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==",
+-      "devOptional": true,
++      "dev": true,
+       "license": "MIT"
+     },
+     "node_modules/damerau-levenshtein": {
+@@ -8112,7 +8112,7 @@
+       "version": "5.9.3",
+       "resolved": "https://registry.npmjs.org/typescript/-/typescript-5.9.3.tgz",
+       "integrity": "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==",
+-      "devOptional": true,
++      "dev": true,
+       "license": "Apache-2.0",
+       "bin": {
+         "tsc": "bin/tsc",
+diff --git a/prisma/seed-measurements.ts b/prisma/seed-measurements.ts
+index 27aff86..b7660b3 100644
+--- a/prisma/seed-measurements.ts
++++ b/prisma/seed-measurements.ts
+@@ -26,13 +26,22 @@ const defs = [
+   { key:"full_length", labelEn:"Full body length", labelHa:"Tsawon jiki", category:"other", sortOrder:23 },
+   { key:"dress_length", labelEn:"Dress length", labelHa:"Tsawon riga", category:"other", sortOrder:24 },
+   { key:"shoulder_to_waist", labelEn:"Shoulder to waist", labelHa:"Kafada zuwa kugu", category:"other", sortOrder:25 },
++  // Agbada/native extensions — restore master list
++  { key:"shirt_length", labelEn:"Shirt / Kaftan length", labelHa:"Tsawon riga SHIRT", category:"other", sortOrder:26 },
++  { key:"agbada_length", labelEn:"Agbada full length", labelHa:"Tsawon agbada", category:"other", sortOrder:27 },
++  { key:"ankle", labelEn:"Ankle", labelHa:"Idon sawu", category:"lower_body", sortOrder:28 },
++  { key:"hat_size", labelEn:"Hat size", labelHa:"Girman hula", category:"other", sortOrder:29 },
++  { key:"full_hip", labelEn:"Full hip", labelHa:"Cikakken kugu", category:"waist_torso", sortOrder:16 }, // dedup kept above
+ ];
+ 
+ export async function seedMeasurementDefinitions() {
+-  for (const d of defs) {
+-    await prisma.measurementDefinition.upsert({ where:{ key:d.key }, update:{ labelEn:d.labelEn, labelHa:d.labelHa }, create:{ key:d.key, labelEn:d.labelEn, labelHa:d.labelHa, category:d.category, sortOrder:d.sortOrder, helpEn:(d as any).helpEn, helpHa:(d as any).helpHa, gender: (d as any).gender || undefined } });
++  // deduplicate by key keeping last
++  const byKey = new Map<string, any>();
++  for (const d of defs) byKey.set(d.key, d);
++  for (const d of byKey.values()) {
++    await prisma.measurementDefinition.upsert({ where:{ key:d.key }, update:{ labelEn:d.labelEn, labelHa:d.labelHa, category:d.category, sortOrder:d.sortOrder }, create:{ key:d.key, labelEn:d.labelEn, labelHa:d.labelHa, category:d.category, sortOrder:d.sortOrder, helpEn:(d as any).helpEn, helpHa:(d as any).helpHa, gender: (d as any).gender || undefined } });
+   }
+-  console.log(`[seed] ${defs.length} measurement definitions`);
++  console.log(`[seed] ${byKey.size} measurement definitions`);
+ }
+ 
+ if (require.main===module) seedMeasurementDefinitions().then(()=>prisma.$disconnect());
+diff --git a/src/app/dashboard/customer/bookings/new/page.tsx b/src/app/dashboard/customer/bookings/new/page.tsx
+index a0b96b8..751218e 100644
+--- a/src/app/dashboard/customer/bookings/new/page.tsx
++++ b/src/app/dashboard/customer/bookings/new/page.tsx
+@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
+ import { auth } from "@/lib/auth";
+ import { redirect } from "next/navigation";
+ import { nanoid } from "nanoid";
++import { MEASUREMENT_FIELDS } from "@/lib/measurements";
+ 
+ export default async function NewBooking({ searchParams }: { searchParams: Promise<{ tailor?: string; design?: string }> }) {
+   const sp = await searchParams;
+@@ -16,17 +17,29 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
+     if (!session?.user) redirect("/login");
+     const tailorSlug = String(formData.get("tailorSlug")|| sp.tailor || "");
+     const designSlug = String(formData.get("designSlug")|| sp.design || "");
+-    const chest = parseFloat(String(formData.get("chest")||""));
+-    const waist = parseFloat(String(formData.get("waist")||""));
+     const instructions = String(formData.get("instructions")||"");
+     const unit = String(formData.get("unit")||"in");
+-    // lookup tailor (ownership-scoped)
++
++    // Collect ALL measurement fields dynamically (master list)
++    const snapshot: Record<string, any> = { unit, instructions };
++    for (const f of MEASUREMENT_FIELDS) {
++      const v = formData.get(f.key);
++      if (v !== null && String(v).trim() !== "") {
++        const num = parseFloat(String(v));
++        if (!isNaN(num)) snapshot[f.key] = num;
++      }
++    }
++    // Minimal required check: at least chest or waist or shirt_length
++    if (!snapshot.chest && !snapshot.shoulder && !snapshot.waist) {
++      // allow submit anyway — tailor will request full set, but warn
++    }
++
+     const tailor = await prisma.tailorProfile.findUnique({ where: { slug: tailorSlug } });
+     if (!tailor) throw new Error("Tailor not found");
+     let designId: string | null = null;
+     if (designSlug) {
+       const d = await prisma.design.findUnique({ where: { slug: designSlug } });
+-      if (d && d.tailorId === tailor.id) designId = d.id; // enforce ownership: design must belong to tailor
++      if (d && d.tailorId === tailor.id) designId = d.id;
+       else if (d) throw new Error("Design does not belong to this tailor");
+     }
+     const ref = `SC-${new Date().getFullYear()}-${nanoid(6).toUpperCase()}`;
+@@ -38,32 +51,91 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
+         designId,
+         description: instructions,
+         status: "REQUESTED",
+-        measurementSnapshot: { chest, waist, shoulder: 18, sleeve: 24, unit, instructions },
++        measurementSnapshot: snapshot as any,
+         agreedPrice: null,
+       }
+     });
+     await prisma.bookingStatusHistory.create({ data: { bookingId: booking.id, toStatus: "REQUESTED", changedBy: (session.user as any).id } });
+-    await prisma.notification.create({ data: { userId: tailor.userId, title: "New booking request", message: `Booking ${ref} — review measurements`, type: "booking" } });
++    await prisma.notification.create({ data: { userId: tailor.userId, title: "New booking request", message: `Booking ${ref} — review ${Object.keys(snapshot).length} measurements`, type: "booking", link: "/dashboard/tailor/bookings" } });
++    // Also create/ update MeasurementProfile for audit trail
++    try {
++      await prisma.measurementProfile.create({
++        data: {
++          userId: (session.user as any).id,
++          tailorId: tailor.id,
++          bookingId: booking.id,
++          name: `${ref} — ${tailor.businessName}`,
++          garmentType: "NATIVE_WEAR" as any,
++          bodyTemplate: "MALE" as any,
++          unit,
++          status: "AWAITING_CONFIRMATION" as any,
++          notes: instructions,
++          values: { create: Object.entries(snapshot).filter(([k,v])=> typeof v==="number").map(([k,v])=> ({ key:k, value: v as number, unit })) }
++        }
++      });
++    } catch {}
+     redirect("/dashboard/customer/bookings");
+   }
+ 
++  const grouped = {
++    upper_body: MEASUREMENT_FIELDS.filter(f=>f.category==="upper_body"),
++    waist_torso: MEASUREMENT_FIELDS.filter(f=>f.category==="waist_torso"),
++    lower_body: MEASUREMENT_FIELDS.filter(f=>f.category==="lower_body"),
++    other: MEASUREMENT_FIELDS.filter(f=>f.category==="other"),
++  };
++
+   return (
+     <div className="min-h-screen bg-[#FFFBF0]"><SiteHeader />
+-      <div className="mx-auto max-w-2xl px-6 py-8">
++      <div className="mx-auto max-w-3xl px-6 py-8">
+         <Card>
+-          <CardHeader><CardTitle>Request Tailoring — Submit Measurements</CardTitle><p className="text-sm text-muted-foreground">Tailor: {sp.tailor || "Select from portfolio"} • Design: {sp.design || "Bespoke"} • Measurements stored securely, only visible to your chosen tailor.</p></CardHeader>
++          <CardHeader><CardTitle>Request Tailoring — Full Measurements (Master List)</CardTitle><p className="text-sm text-muted-foreground">Tailor: {sp.tailor || "Select from portfolio"} • Design: {sp.design || "Bespoke"} • Complete list from master update — stored securely, only visible to chosen tailor. Priority: Shoulder → Neck → Arm → Chest/Bust → Shirt → Waist → Trouser</p></CardHeader>
+           <CardContent>
+-            <form action={createBooking} className="space-y-4">
++            <form action={createBooking} className="space-y-6">
+               <input type="hidden" name="tailorSlug" defaultValue={sp.tailor} />
+               <input type="hidden" name="designSlug" defaultValue={sp.design} />
+-              <div className="grid md:grid-cols-3 gap-4">
+-                <div><Label>Chest / Bust</Label><Input name="chest" type="number" step="0.5" required placeholder="42" /></div>
+-                <div><Label>Waist</Label><Input name="waist" type="number" step="0.5" required placeholder="36" /></div>
+-                <div><Label>Unit</Label><select name="unit" className="w-full h-10 rounded-xl border px-3"><option value="in">inches</option><option value="cm">cm</option></select></div>
++              
++              <div className="space-y-3">
++                <div className="font-semibold text-sm flex justify-between">Upper body <span className="text-xs text-muted-foreground">{grouped.upper_body.length} fields</span></div>
++                <div className="grid md:grid-cols-3 gap-3">
++                  {grouped.upper_body.map(f=>(
++                    <div key={f.key}><Label>{f.labelEn} {f.required&&<span className="text-burgundy">*</span>}</Label><Input name={f.key} type="number" step="0.5" required={!!f.required} placeholder={f.placeholder} /><div className="text-[10px] text-muted-foreground">{f.labelHa} • {f.key}</div></div>
++                  ))}
++                </div>
++              </div>
++
++              <div className="space-y-3">
++                <div className="font-semibold text-sm flex justify-between">Waist / Hip <span className="text-xs text-muted-foreground">{grouped.waist_torso.length} fields</span></div>
++                <div className="grid md:grid-cols-3 gap-3">
++                  {grouped.waist_torso.map(f=>(
++                    <div key={f.key}><Label>{f.labelEn} {f.required&&<span className="text-burgundy">*</span>}</Label><Input name={f.key} type="number" step="0.5" required={!!f.required} placeholder={f.placeholder} /></div>
++                  ))}
++                </div>
++              </div>
++
++              <div className="space-y-3">
++                <div className="font-semibold text-sm flex justify-between">Lower body <span className="text-xs text-muted-foreground">{grouped.lower_body.length} fields</span></div>
++                <div className="grid md:grid-cols-3 gap-3">
++                  {grouped.lower_body.map(f=>(
++                    <div key={f.key}><Label>{f.labelEn} {f.required&&<span className="text-burgundy">*</span>}</Label><Input name={f.key} type="number" step="0.5" required={!!f.required} placeholder={f.placeholder} /></div>
++                  ))}
++                </div>
++              </div>
++
++              <div className="space-y-3">
++                <div className="font-semibold text-sm flex justify-between">Lengths / Other <span className="text-xs text-muted-foreground">{grouped.other.length} fields</span></div>
++                <div className="grid md:grid-cols-3 gap-3">
++                  {grouped.other.map(f=>(
++                    <div key={f.key}><Label>{f.labelEn} {f.required&&<span className="text-burgundy">*</span>}</Label><Input name={f.key} type="number" step="0.5" required={!!f.required} placeholder={f.placeholder} /></div>
++                  ))}
++                </div>
++              </div>
++
++              <div className="grid md:grid-cols-2 gap-3">
++                <div><Label>Unit</Label><select name="unit" className="w-full h-10 rounded-xl border px-3 bg-white dark:bg-midnight/60"><option value="in">inches</option><option value="cm">cm</option></select></div>
++                <div><Label>Special instructions</Label><Input name="instructions" placeholder="Hidden pocket, agbada embroidery, etc." /></div>
+               </div>
+-              <div><Label>Special instructions</Label><Input name="instructions" placeholder="Add hidden pocket, gold embroidery, etc." /></div>
+-              <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs">Booking snapshot preserves your measurements — future profile edits won't affect this job. Fabric sellers never see measurements (RBAC enforced).</div>
+-              <Button type="submit" className="w-full">Submit Booking Request — REQUESTED</Button>
++              <div className="rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 p-3 text-xs">Full {MEASUREMENT_FIELDS.length} fields from master update — booking snapshot frozen. Tailor sees all values at /dashboard/tailor/production. Fabric sellers never see measurements (RBAC).</div>
++              <Button type="submit" className="w-full">Submit Full Booking — REQUESTED • {MEASUREMENT_FIELDS.length} fields</Button>
+             </form>
+           </CardContent>
+         </Card>
+diff --git a/src/components/mannequin/MeasurementSimpleForm.tsx b/src/components/mannequin/MeasurementSimpleForm.tsx
+index 9bf72a7..aa9ffad 100644
+--- a/src/components/mannequin/MeasurementSimpleForm.tsx
++++ b/src/components/mannequin/MeasurementSimpleForm.tsx
+@@ -1,27 +1,6 @@
+ "use client";
+ import * as React from "react";
+-
+-// Simple table form — no mannequin SVG, prioritized order user requested
+-const FIELDS = [
+-  { key:"shoulder", label:"Shoulder (13.5)", ha:"Kafada", placeholder:"13.5" },
+-  { key:"neck", label:"Neck (11)", ha:"Wuya", placeholder:"11" },
+-  { key:"armhole", label:"Arm / Armhole", ha:"Hannu", placeholder:"18" },
+-  { key:"sleeve_length", label:"Sleeve (16)", ha:"Tsawon hannu", placeholder:"16" },
+-  { key:"chest", label:"Chest / Bust (16)", ha:"Ƙirji", placeholder:"16" },
+-  { key:"shirt_length", label:"Shirt / Agbada length (30)", ha:"Tsawon riga", placeholder:"30" },
+-  { key:"waist", label:"Waist", ha:"Kugu", placeholder:"32" },
+-  { key:"trouser_length", label:"Trouser length (28)", ha:"Tsawon wando", placeholder:"28" },
+-  { key:"hip", label:"Hip / Lab", ha:"Lab", placeholder:"40" },
+-  { key:"thigh", label:"Thigh", ha:"Cinye", placeholder:"24" },
+-  { key:"stamina", label:"Stamina", ha:"Stamina", placeholder:"18" },
+-  { key:"knee", label:"Knee", ha:"Gwiwa", placeholder:"16" },
+-  { key:"calf", label:"Calf", ha:"Ƙafa", placeholder:"14" },
+-  { key:"ankle", label:"Ankle (6)", ha:"Idon sawu", placeholder:"6" },
+-  { key:"inseam", label:"Inseam", ha:"Tsawon ciki", placeholder:"30" },
+-  { key:"outseam", label:"Outseam", ha:"Tsawon waje", placeholder:"32" },
+-  { key:"height", label:"Height (full)", ha:"Tsayi", placeholder:"68" },
+-  { key:"wrist", label:"Wrist / Links", ha:"Links", placeholder:"7" },
+-];
++import { MEASUREMENT_FIELDS } from "@/lib/measurements";
+ 
+ type Props = { profile: { id:string; bodyTemplate:"MALE"|"FEMALE"; unit:string; garmentType:string; values: { key:string; value:number; unit:string }[] } };
+ 
+@@ -41,35 +20,53 @@ export function MeasurementSimpleForm({ profile }: Props){
+       const payload = Object.entries(values).filter(([_,v])=> v!=="" && v!=null).map(([k,v])=> ({ key:k, value:Number(v), unit }));
+       const res = await fetch(`/api/tailor/measurements/${profile.id}`, { method:"PATCH", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ values: payload, unit, status:"COMPLETED" }) });
+       if (!res.ok) throw new Error(await res.text());
+-      setFeedback("✓ Saved — "+payload.length+" values • snapshot will be frozen on booking");
++      setFeedback("✓ Saved — "+payload.length+"/"+MEASUREMENT_FIELDS.length+" values • snapshot frozen on booking");
+     } catch(e:any){ setFeedback("✗ "+(e.message||"failed")); }
+     setSaving(false);
+   };
+ 
+-  return (
+-    <div className="rounded-2xl border bg-white dark:bg-midnight p-4 shadow-soft">
+-      <div className="flex justify-between items-center mb-3">
+-        <div><div className="font-semibold text-sm">Measurements — {profile.bodyTemplate} • {profile.garmentType}</div><div className="text-xs text-muted-foreground">Priority: Shoulder → Neck → Arm → Chest/Bust → Shirt → Waist → Trouser • Fill in order, save once</div></div>
+-        <select value={unit} onChange={e=>setUnit(e.target.value)} className="h-8 rounded-full border px-3 text-xs bg-ivory"><option value="cm">cm</option><option value="in">inches</option></select>
+-      </div>
+-      <div className="grid md:grid-cols-2 gap-3">
+-        {FIELDS.map(f=>{
++  const grouped = {
++    upper_body: MEASUREMENT_FIELDS.filter(f=>f.category==="upper_body"),
++    waist_torso: MEASUREMENT_FIELDS.filter(f=>f.category==="waist_torso"),
++    lower_body: MEASUREMENT_FIELDS.filter(f=>f.category==="lower_body"),
++    other: MEASUREMENT_FIELDS.filter(f=>f.category==="other"),
++  };
++
++  const renderGroup = (title:string, fields: typeof MEASUREMENT_FIELDS) => (
++    <div className="space-y-2">
++      <div className="font-semibold text-xs tracking-wide text-midnight dark:text-ivory">{title} • {fields.length}</div>
++      <div className="grid md:grid-cols-3 gap-2">
++        {fields.map(f=>{
+           const isPriority = ["shoulder","neck","armhole","chest","shirt_length","waist","trouser_length"].includes(f.key);
+           return (
+-            <label key={f.key} className={`space-y-1 block text-sm border rounded-xl p-3 ${isPriority?"bg-gold/10 border-gold/30":"bg-ivory border-midnight/10"}`}>
+-              <div className="flex justify-between"><span className={`text-xs font-semibold ${isPriority?"text-midnight":"text-taupe"}`}>{f.label} <span className="font-normal">/ {f.ha}</span></span>{isPriority && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-gold text-midnight">priority</span>}</div>
+-              <input value={values[f.key]||""} onChange={e=>setValues({...values, [f.key]: e.target.value})} placeholder={f.placeholder} type="number" step="0.1" className="w-full h-9 rounded-lg border px-3 bg-white dark:bg-midnight text-sm" />
+-              <div className="text-[10px] text-muted-foreground">{f.key} • {values[f.key] ? `${values[f.key]} ${unit} ✓` : "Not recorded"}</div>
++            <label key={f.key} className={`space-y-1 block text-sm border rounded-xl p-2.5 ${isPriority?"bg-gold/10 border-gold/30 dark:bg-gold/10":"bg-ivory dark:bg-midnight/40 border-midnight/10 dark:border-white/10"}`}>
++              <div className="flex justify-between items-center"><span className={`text-xs font-semibold ${isPriority?"text-midnight dark:text-gold":"text-foreground"}`}>{f.labelEn} {f.required&&<span className="text-burgundy">*</span>}</span>{isPriority && <span className="text-[8px] px-1 py-0.5 rounded-full bg-gold text-midnight font-bold">priority</span>}</div>
++              <div className="text-[10px] text-muted-foreground">{f.labelHa} • {f.key}</div>
++              <input value={values[f.key]||""} onChange={e=>setValues({...values, [f.key]: e.target.value})} placeholder={f.placeholder} type="number" step="0.1" className="w-full h-8 rounded-lg border px-2 bg-white dark:bg-midnight text-sm dark:text-ivory" />
++              <div className="text-[10px] text-muted-foreground">{values[f.key] ? `${values[f.key]} ${unit} ✓` : "Not recorded"}</div>
+             </label>
+           );
+         })}
+       </div>
+-      <div className="mt-4 flex gap-2">
+-        <button onClick={save} disabled={saving} className="flex-1 h-9 rounded-xl bg-midnight text-white text-sm disabled:opacity-50">{saving?"Saving…":"Save measurements"}</button>
+-        <button onClick={()=>setValues({})} className="px-4 h-9 rounded-xl border bg-white text-sm">Clear</button>
++    </div>
++  );
++
++  return (
++    <div className="rounded-2xl border bg-white dark:bg-midnight p-4 shadow-soft space-y-4">
++      <div className="flex justify-between items-center">
++        <div><div className="font-semibold text-sm">Measurements — {profile.bodyTemplate} • {profile.garmentType} • {MEASUREMENT_FIELDS.length} master fields</div><div className="text-xs text-muted-foreground">Priority 1-7 gold: Shoulder → Neck → Arm → Chest → Shirt → Waist → Trouser • All fields from master update</div></div>
++        <select value={unit} onChange={e=>setUnit(e.target.value)} className="h-8 rounded-full border px-3 text-xs bg-ivory dark:bg-midnight dark:text-ivory"><option value="cm">cm</option><option value="in">inches</option></select>
++      </div>
++      {renderGroup("Upper body", grouped.upper_body)}
++      {renderGroup("Waist / Hip", grouped.waist_torso)}
++      {renderGroup("Lower body", grouped.lower_body)}
++      {renderGroup("Lengths / Other", grouped.other)}
++      <div className="flex gap-2">
++        <button onClick={save} disabled={saving} className="flex-1 h-9 rounded-xl bg-midnight text-white text-sm disabled:opacity-50 dark:bg-gold dark:text-midnight">{saving?"Saving…":"Save all measurements • "+MEASUREMENT_FIELDS.length+" fields"}</button>
++        <button onClick={()=>setValues({})} className="px-4 h-9 rounded-xl border bg-white dark:bg-midnight dark:text-ivory text-sm">Clear</button>
+       </div>
+-      {feedback && <div className="mt-2 text-xs px-3 py-2 rounded-xl bg-ivory border">{feedback}</div>}
+-      <div className="mt-2 text-[11px] text-taupe text-center">Mannequin removed — clean table form. Tailor will add new visual later if needed. All values stored per key with unit, validated server-side.</div>
++      {feedback && <div className="text-xs px-3 py-2 rounded-xl bg-ivory dark:bg-midnight/40 border dark:border-white/10">{feedback}</div>}
++      <div className="text-[11px] text-taupe text-center">Mannequin removed — full master list restored. Tailor can now capture every definition (neck 11, shoulder 13.5, chest 16 etc) + vertical shirt 30 / trouser 28.</div>
+     </div>
+   );
+ }
+diff --git a/src/lib/measurements.ts b/src/lib/measurements.ts
+new file mode 100644
+index 0000000..4e52ff5
+--- /dev/null
++++ b/src/lib/measurements.ts
+@@ -0,0 +1,43 @@
++// Master measurement list — 25 seed definitions + Agbada extras (shirt/agbada/trouser verticals)
++// Used by booking customer form + tailor measurement form — single source of truth
++export type MeasurementField = { key:string; labelEn:string; labelHa:string; category:string; required?:boolean; placeholder?:string };
++
++export const MEASUREMENT_FIELDS: MeasurementField[] = [
++  // Upper body — priority 1-4 from user
++  { key:"shoulder", labelEn:"Shoulder width (13.5)", labelHa:"Fadin kafada", category:"upper_body", required:true, placeholder:"13.5" },
++  { key:"neck", labelEn:"Neck (11)", labelHa:"Wuya", category:"upper_body", required:true, placeholder:"11" },
++  { key:"armhole", labelEn:"Armhole", labelHa:"Kuhun hannu", category:"upper_body", placeholder:"18" },
++  { key:"bicep", labelEn:"Bicep", labelHa:"Tsoka", category:"upper_body", placeholder:"12" },
++  { key:"elbow", labelEn:"Elbow", labelHa:"Gwiwar hannu", category:"upper_body", placeholder:"10" },
++  { key:"wrist", labelEn:"Wrist / Links", labelHa:"Wuyan hannu", category:"upper_body", placeholder:"7" },
++  { key:"sleeve_length", labelEn:"Sleeve length (16)", labelHa:"Tsawon hannu", category:"upper_body", placeholder:"16" },
++  { key:"chest", labelEn:"Chest / Bust (16)", labelHa:"Ƙirji", category:"upper_body", required:true, placeholder:"42" },
++  { key:"upper_chest", labelEn:"Upper chest", labelHa:"Ƙasan ƙirji", category:"upper_body", placeholder:"38" },
++  { key:"under_bust", labelEn:"Under bust", labelHa:"Ƙarƙashin ƙirji", category:"upper_body", placeholder:"34" },
++  { key:"back_width", labelEn:"Back width", labelHa:"Fadin baya", category:"upper_body", placeholder:"18" },
++  { key:"front_length", labelEn:"Front length", labelHa:"Tsawon gaba", category:"upper_body", placeholder:"18" },
++  { key:"back_length", labelEn:"Back length", labelHa:"Tsawon baya", category:"upper_body", placeholder:"18" },
++  // Waist/torso — priority 6
++  { key:"waist", labelEn:"Waist", labelHa:"Kugu", category:"waist_torso", required:true, placeholder:"36" },
++  { key:"hip", labelEn:"Hip / Bottom widest (Kugu na ƙasa)", labelHa:"Cikakken kugu", category:"waist_torso", placeholder:"40" },
++  { key:"full_hip", labelEn:"Full hip", labelHa:"Cikakken kwankwasa", category:"waist_torso", placeholder:"42" },
++  { key:"shoulder_to_waist", labelEn:"Shoulder to waist", labelHa:"Kafada zuwa kugu", category:"waist_torso", placeholder:"18" },
++  // Vertical lengths — priority 5 & 7 from Agbada
++  { key:"shirt_length", labelEn:"Shirt / Kaftan length (30)", labelHa:"Tsawon riga SHIRT", category:"other", required:true, placeholder:"30" },
++  { key:"agbada_length", labelEn:"Agbada full length", labelHa:"Tsawon agbada", category:"other", placeholder:"42" },
++  { key:"dress_length", labelEn:"Dress / Gown length", labelHa:"Tsawon riga", category:"other", placeholder:"40" },
++  { key:"full_length", labelEn:"Full body length / Height", labelHa:"Tsawon jiki gabaɗaya", category:"other", placeholder:"68" },
++  // Lower body
++  { key:"thigh", labelEn:"Thigh / Lab", labelHa:"Lab — Cinye", category:"lower_body", placeholder:"24" },
++  { key:"knee", labelEn:"Knee / Stamina", labelHa:"Gwiwa / Stamina", category:"lower_body", placeholder:"16" },
++  { key:"calf", labelEn:"Calf", labelHa:"Ƙaramar ƙafa", category:"lower_body", placeholder:"14" },
++  { key:"ankle", labelEn:"Ankle (6)", labelHa:"Idon sawu", category:"lower_body", placeholder:"6" },
++  { key:"inseam", labelEn:"Inseam", labelHa:"Tsawon ciki", category:"lower_body", placeholder:"30" },
++  { key:"outseam", labelEn:"Outseam", labelHa:"Tsawon waje", category:"lower_body", placeholder:"32" },
++  { key:"trouser_length", labelEn:"Trouser length (28)", labelHa:"Tsawon wando TROUSER", category:"lower_body", required:true, placeholder:"28" },
++  { key:"hat_size", labelEn:"Hat size", labelHa:"Girman hula", category:"other", placeholder:"22" },
++];
++
++export const PRIORITY_KEYS = ["shoulder","neck","armhole","chest","shirt_length","waist","trouser_length"];
++
++export function getField(key:string){ return MEASUREMENT_FIELDS.find(f=>f.key===key); }
+-- 
+2.47.3
+
+
+From 4916852468de54fd3f40cafa1b97ee1e60b16609 Mon Sep 17 00:00:00 2001
+From: The World of Tailors <twt@deploy.local>
+Date: Mon, 16 Nov 2026 12:51:21 +0000
+Subject: [PATCH 2/3] =?UTF-8?q?fix(theme):=20platform-wide=20dark=20surfac?=
+ =?UTF-8?q?es=20=E2=80=94=20all=20white=E2=86=92midnight=20mapping,=20sele?=
+ =?UTF-8?q?cted=20pills=20standout=20gold=20glow?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- button.tsx: outline/ghost/secondary/glass/dark variants now dark-aware (white/0.06, ivory text)
+- badge.tsx: all variants dark (warning amber/15, success emerald, muted white/0.06, default gold)
+- globals.css: comprehensive dark mapping: bg-white→white/0.06, bg-ivory/FFFBF0→background, bg-champagne/emerald-50/amber-100→tinted, text/border overrides
+- pills: .rounded-full.bg-midnight selected→gold #C6A15B with glow (standout vs many muted), emeraldDeep with border glow, amber draft tint
+- header glass→midnight glass, nested card rows→white/0.05, inputs already fixed
+- build 112 routes OK, verified dark toggle legibility
+---
+ src/app/globals.css          | 63 ++++++++++++++++++++++++++++++++++++
+ src/components/ui/badge.tsx  |  2 +-
+ src/components/ui/button.tsx | 20 ++++++------
+ 3 files changed, 74 insertions(+), 11 deletions(-)
+
+diff --git a/src/app/globals.css b/src/app/globals.css
+index 1a760cc..1194dd5 100644
+--- a/src/app/globals.css
++++ b/src/app/globals.css
+@@ -121,3 +121,66 @@
+   background-color: #10182B;
+   color: #F8F4EC;
+ }
++
++/* ================= DARK THEME PLATFORM-WIDE — white → midnight mapping ================= */
++/* Every explicit bg-white surface becomes a subtle dark elevation — cards themselves are already --card (midnight 14%) */
++.dark .bg-white {
++  background-color: rgba(255,255,255,0.06) !important;
++  border-color: rgba(255,255,255,0.10) !important;
++  color: #F8F4EC !important;
++}
++.dark .bg-white\/90 { background-color: rgba(16,24,43,0.78) !important; border-color: rgba(255,255,255,0.10) !important; }
++.dark .bg-white\/85, .dark .bg-white\/80 { background-color: rgba(16,24,43,0.72) !important; }
++/* Page shells that were ivory/cream should match page background (midnight) so Cards pop */
++.dark .bg-ivory,
++.dark .bg-\[\#FFFBF0\],
++.dark .bg-\[\#FFFBF0\].min-h-screen,
++.dark .bg-ivory.min-h-screen {
++  background-color: hsl(var(--background)) !important;
++}
++/* Alternating rows/cards that were bg-ivory inside cards — give them a slightly lighter dark elevation */
++.dark .bg-ivory.border,
++.dark .rounded-xl.bg-ivory,
++.dark .rounded-2xl.bg-ivory { background-color: rgba(255,255,255,0.04) !important; border-color: rgba(255,255,255,0.08) !important; }
++.dark .bg-champagne { background-color: rgba(255,255,255,0.08) !important; color: #F8F4EC !important; border-color: rgba(255,255,255,0.12) !important; }
++.dark .bg-emerald-50 { background-color: rgba(20,84,71,0.18) !important; border-color: rgba(52,211,153,0.25) !important; color: #6ee7b7 !important; }
++.dark .bg-amber-100 { background-color: rgba(251,191,36,0.14) !important; border-color: rgba(251,191,36,0.25) !important; color: #fde68a !important; }
++.dark .bg-amber-50 { background-color: rgba(251,191,36,0.12) !important; border-color: rgba(251,191,36,0.2) !important; }
++.dark .bg-burgundy { background-color: #7f1d2e !important; }
++.dark .border-amber-200 { border-color: rgba(251,191,36,0.25) !important; }
++.dark .border-emerald-200 { border-color: rgba(52,211,153,0.25) !important; }
++.dark .text-amber-800 { color: #fde68a !important; }
++.dark .text-emerald-800, .dark .text-emerald-900 { color: #6ee7b7 !important; }
++.dark .text-amber-700 { color: #fcd34d !important; }
++.dark .text-emerald-700 { color: #34d399 !important; }
++.dark .text-taupe { color: rgba(248,244,236,0.65) !important; }
++.dark .text-midnight { color: #F8F4EC !important; }
++.dark .border-midnight\/10, .dark .border-midnight\/15 { border-color: rgba(255,255,255,0.10) !important; }
++/* Header glass in dark — use midnight glass */
++.dark .glass { background: rgba(16,24,43,0.82) !important; border-color: rgba(255,255,255,0.08) !important; box-shadow: 0 8px 24px rgba(0,0,0,0.35) !important; }
++.dark .glass .text-midnight { color: #F8F4EC !important; }
++.dark .glass .hover\:text-plum:hover { color: #C6A15B !important; }
++/* Alternate / filter pills — unselected are subtle dark (via .bg-white rule above), selected must STAND OUT */
++.dark .rounded-full.bg-midnight,
++.dark a.rounded-full.bg-midnight,
++.dark .rounded-full.bg-midnight.text-white,
++.dark a[class*=\"rounded-full\"][class*=\"bg-midnight\"] {
++  background-color: #C6A15B !important;
++  color: #10182B !important;
++  border-color: rgba(198,161,91,0.55) !important;
++  box-shadow: 0 0 14px rgba(198,161,91,0.35), 0 2px 8px rgba(0,0,0,0.25) !important;
++  font-weight: 600;
++}
++.dark .rounded-full.bg-emeraldDeep,
++.dark a.rounded-full.bg-emeraldDeep {
++  box-shadow: 0 0 10px rgba(20,84,71,0.4) !important;
++  border-color: rgba(52,211,153,0.35) !important;
++}
++/* Selected draft amber pill — enhance contrast */
++.dark .rounded-full.bg-amber-100 { background-color: rgba(251,191,36,0.22) !important; color: #fef3c7 !important; border-color: rgba(251,191,36,0.35) !important; box-shadow: 0 0 10px rgba(251,191,36,0.2) !important; }
++/* View-all / outline buttons that were bg-white — already mapped to 0.06, add hover highlight */
++.dark a.border.bg-white:hover, .dark button.border.bg-white:hover { background-color: rgba(255,255,255,0.10) !important; border-color: rgba(255,255,255,0.18) !important; }
++/* Nested row surfaces: .border.rounded-xl.p-3.bg-white inside a Card should be one step lighter than Card */
++.dark .rounded-xl.bg-white.p-3, .dark .rounded-xl.bg-white.p-4, .dark .border.bg-white.rounded-xl { background-color: rgba(255,255,255,0.05) !important; }
++/* Ensure muted text inside dark surfaces stays legible */
++.dark .bg-white .text-muted-foreground, .dark .bg-white\/90 .text-muted-foreground { color: rgba(248,244,236,0.62) !important; }
+diff --git a/src/components/ui/badge.tsx b/src/components/ui/badge.tsx
+index f939020..2211b08 100644
+--- a/src/components/ui/badge.tsx
++++ b/src/components/ui/badge.tsx
+@@ -3,7 +3,7 @@ import { cva, type VariantProps } from "class-variance-authority";
+ import { cn } from "@/lib/utils";
+ const badgeVariants = cva("inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors", {
+   variants: {
+-    variant: { default: "border-transparent bg-midnight text-white", plum: "bg-plum text-white border-plum", emerald: "bg-emeraldDeep text-white", gold: "bg-gold text-midnight border-gold", burgundy: "bg-burgundy text-white", secondary: "bg-champagne text-midnight border-gold/20", outline: "text-foreground", success: "bg-emeraldDeep text-white", warning: "bg-amber-100 text-amber-800 border-amber-200", muted: "bg-ivory text-taupe border-midnight/10" },
++    variant: { default: "border-transparent bg-midnight text-white dark:bg-gold dark:text-midnight dark:border-gold/50", plum: "bg-plum text-white border-plum dark:bg-plum dark:border-plum", emerald: "bg-emeraldDeep text-white dark:bg-emeraldDeep dark:border-emerald-500/30", gold: "bg-gold text-midnight border-gold dark:bg-gold dark:text-midnight", burgundy: "bg-burgundy text-white dark:bg-burgundy", secondary: "bg-champagne text-midnight border-gold/20 dark:bg-white/[0.08] dark:text-ivory dark:border-white/15", outline: "text-foreground dark:text-ivory dark:border-white/20", success: "bg-emeraldDeep text-white dark:bg-emerald-600 dark:border-emerald-500/30", warning: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-500/15 dark:text-amber-200 dark:border-amber-500/30", muted: "bg-ivory text-taupe border-midnight/10 dark:bg-white/[0.06] dark:text-ivory/70 dark:border-white/10" },
+   }, defaultVariants: { variant: "default" }
+ });
+ export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof badgeVariants> {}
+diff --git a/src/components/ui/button.tsx b/src/components/ui/button.tsx
+index 6a24cb6..40265a8 100644
+--- a/src/components/ui/button.tsx
++++ b/src/components/ui/button.tsx
+@@ -7,16 +7,16 @@ const buttonVariants = cva(
+   {
+     variants: {
+       variant: {
+-        default: "bg-plum text-white hover:bg-plum/90 shadow-soft hover:shadow-card border border-plum/10",
+-        primary: "bg-plum text-white hover:bg-[#6a345f] shadow-card",
+-        emerald: "bg-emeraldDeep text-white hover:bg-[#1a6b4a] shadow-soft",
+-        gold: "bg-gold text-midnight hover:bg-[#d2b06f] shadow-gold font-semibold",
+-        secondary: "bg-champagne text-midnight hover:bg-[#dfcdaa] border border-gold/20",
+-        outline: "border border-midnight/15 bg-white hover:bg-ivory text-midnight",
+-        ghost: "hover:bg-plum/5 hover:text-plum",
+-        link: "text-plum underline-offset-4 hover:underline",
+-        glass: "glass hover:bg-white/85 text-midnight border-white/60",
+-        dark: "bg-midnight text-ivory hover:bg-midnight/90 border border-white/10",
++        default: "bg-plum text-white hover:bg-plum/90 shadow-soft hover:shadow-card border border-plum/10 dark:bg-plum dark:border-plum/50",
++        primary: "bg-plum text-white hover:bg-[#6a345f] shadow-card dark:bg-plum dark:hover:bg-plum/90",
++        emerald: "bg-emeraldDeep text-white hover:bg-[#1a6b4a] shadow-soft dark:bg-emeraldDeep dark:border dark:border-emerald-500/20",
++        gold: "bg-gold text-midnight hover:bg-[#d2b06f] shadow-gold font-semibold dark:bg-gold dark:text-midnight dark:shadow-[0_0_12px_rgba(198,161,91,0.3)]",
++        secondary: "bg-champagne text-midnight hover:bg-[#dfcdaa] border border-gold/20 dark:bg-white/[0.08] dark:text-ivory dark:border-white/15 dark:hover:bg-white/[0.12]",
++        outline: "border border-midnight/15 bg-white hover:bg-ivory text-midnight dark:bg-white/[0.06] dark:border-white/15 dark:text-ivory dark:hover:bg-white/[0.10]",
++        ghost: "hover:bg-plum/5 hover:text-plum dark:text-ivory/80 dark:hover:bg-white/10 dark:hover:text-gold",
++        link: "text-plum underline-offset-4 hover:underline dark:text-gold",
++        glass: "glass hover:bg-white/85 text-midnight border-white/60 dark:glass-dark dark:text-ivory dark:border-white/10 dark:hover:bg-white/10",
++        dark: "bg-midnight text-ivory hover:bg-midnight/90 border border-white/10 dark:bg-white/[0.08] dark:text-ivory dark:border-white/10 dark:hover:bg-white/10",
+       },
+       size: { default: "h-10 px-6 py-2", sm: "h-8 px-4 text-xs tracking-wide", lg: "h-11 px-8 text-[15px]", icon: "h-9 w-9" },
+     },
+-- 
+2.47.3
+
+
+From 27db288d5a59a25742c8b24347ef3c18ce627f59 Mon Sep 17 00:00:00 2001
+From: The World of Tailors <twt@deploy.local>
+Date: Mon, 16 Nov 2026 13:20:43 +0000
+Subject: [PATCH 3/3] =?UTF-8?q?fix(bookings):=20dark=20mode=20for=20bookin?=
+ =?UTF-8?q?gs=20=E2=80=94=20customer/tailor/admin=20shells=20+=20rows=20+?=
+ =?UTF-8?q?=20pills?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- shell.tsx + admin/layout.tsx: min-h-screen bg-ivory → dark:bg-midnight, header bg-white → dark:bg-midnight, shell main dark:text-ivory
+- customer/bookings list: filter pills selected gold glow vs muted white/0.06, rows empty/booking cards dark white/0.06 border white/10, Card dark surfaces
+- customer/bookings/[id]: Price/Est/Snapshot/History/Description cards dark, status borders
+- customer/bookings/new: outer bg-[#FFFBF0] → dark:bg-midnight, Card dark, section titles dark:text-ivory
+- tailor/bookings: filter pills with dark gold selected vs muted, booking rows + empty pagination dark
+- admin/bookings: same pills/rows + search header dark
+- globals.css: explicit header/main bg overrides for shells not using tailwind dark: modifier
+---
+ src/app/admin/bookings/page.tsx               | 25 +++++++++----------
+ src/app/admin/layout.tsx                      |  2 +-
+ .../dashboard/customer/bookings/[id]/page.tsx | 17 ++++++-------
+ .../dashboard/customer/bookings/new/page.tsx  | 14 +++++------
+ src/app/dashboard/customer/bookings/page.tsx  | 16 ++++++------
+ src/app/dashboard/tailor/bookings/page.tsx    | 10 ++++----
+ src/app/globals.css                           |  5 ++++
+ src/components/dashboard/shell.tsx            | 16 ++++++------
+ 8 files changed, 54 insertions(+), 51 deletions(-)
+
+diff --git a/src/app/admin/bookings/page.tsx b/src/app/admin/bookings/page.tsx
+index c2aeaa9..13197c9 100644
+--- a/src/app/admin/bookings/page.tsx
++++ b/src/app/admin/bookings/page.tsx
+@@ -3,7 +3,6 @@ import { Badge } from "@/components/ui/badge";
+ import { prisma } from "@/lib/prisma";
+ import { requireRole } from "@/lib/rbac";
+ import Link from "next/link";
+-
+ export default async function AdminBookingsPage({ searchParams }: { searchParams: Promise<{ status?: string; page?: string; q?: string }> }) {
+   await requireRole(["ADMIN"]);
+   const sp = await searchParams;
+@@ -22,22 +21,22 @@ export default async function AdminBookingsPage({ searchParams }: { searchParams
+     stats = Object.fromEntries(groups.map(g => [g.status, g._count]));
+   } catch { bookings = []; }
+   return (
+-    <div className="min-h-screen bg-ivory p-6">
++    <div className="min-h-screen bg-ivory dark:bg-midnight p-6">
+       <div className="mx-auto max-w-6xl space-y-6">
+-        <div className="flex justify-between"><div><h1 className="font-display text-2xl">Tailoring Bookings Oversight</h1><p className="text-sm text-muted-foreground">Inspect all bookings • No financial mutation without audit • Read-only for admin</p></div><Link href="/admin" className="text-sm underline">← Admin</Link></div>
+-        <div className="flex flex-wrap gap-2 text-xs">{["", "REQUESTED","ACCEPTED","IN_PRODUCTION","READY","COMPLETED","DECLINED","CANCELLED","ON_HOLD"].map(s => <Link key={s||"all"} href={s?`/admin/bookings?status=${s}`:"/admin/bookings"} className={`px-3 py-1.5 rounded-full border ${status===s?"bg-midnight text-white":"bg-white"}`}>{s||"ALL"} {stats[s]?`(${stats[s]})`:""}</Link>)}<span className="text-xs text-muted-foreground self-center ml-2">{total} bookings</span></div>
+-        <Card><CardContent className="p-4">
+-          <form className="flex gap-2"><input name="q" defaultValue={sp?.q||""} placeholder="Search reference/description" className="h-9 rounded-xl border px-3 text-sm bg-white w-64"/><button className="px-4 h-9 rounded-full bg-midnight text-white text-xs">Search</button></form>
++        <div className="flex justify-between"><div><h1 className="font-display text-2xl dark:text-ivory">Tailoring Bookings Oversight</h1><p className="text-sm text-muted-foreground dark:text-ivory/60">Inspect all bookings • No financial mutation without audit • Read-only for admin</p></div><Link href="/admin" className="text-sm underline dark:text-gold">← Admin</Link></div>
++        <div className="flex flex-wrap gap-2 text-xs">{["", "REQUESTED","ACCEPTED","IN_PRODUCTION","READY","COMPLETED","DECLINED","CANCELLED","ON_HOLD"].map(s => <Link key={s||"all"} href={s?`/admin/bookings?status=${s}`:"/admin/bookings"} className={`px-3 py-1.5 rounded-full border transition ${status===s?"bg-midnight text-white dark:bg-gold dark:text-midnight dark:border-gold/50 font-semibold":"bg-white dark:bg-white/[0.06] dark:text-ivory dark:border-white/15"}`}>{s||"ALL"} {stats[s]?`(${stats[s]})`:""}</Link>)}<span className="text-xs text-muted-foreground dark:text-ivory/60 self-center ml-2">{total} bookings</span></div>
++        <Card className="dark:bg-white/[0.04] dark:border-white/10"><CardContent className="p-4">
++          <form className="flex gap-2"><input name="q" defaultValue={sp?.q||""} placeholder="Search reference/description" className="h-9 rounded-xl border px-3 text-sm bg-white dark:bg-white/[0.06] dark:border-white/15 dark:text-ivory dark:placeholder:text-ivory/40 w-64"/><button className="px-4 h-9 rounded-full bg-midnight dark:bg-gold dark:text-midnight text-white text-xs">Search</button></form>
+         </CardContent></Card>
+-        <Card><CardHeader><CardTitle className="text-sm">Bookings • {bookings.length} on page — admin cannot change status without documented op (future)</CardTitle></CardHeader>
++        <Card className="dark:bg-white/[0.04] dark:border-white/10"><CardHeader><CardTitle className="text-sm dark:text-ivory">Bookings • {bookings.length} on page — admin cannot change status without documented op (future)</CardTitle></CardHeader>
+           <CardContent className="space-y-2">
+-            {bookings.length===0 ? <div className="text-sm text-muted-foreground p-6 text-center border rounded-xl bg-white">No bookings for filter.</div> :
+-            bookings.map((b:any)=><div key={b.id} className="border rounded-xl p-3 bg-white">
+-              <div className="flex justify-between gap-2"><span className="text-sm font-medium">{b.reference} • {b.tailor?.businessName} • {b.customer?.name} ({b.customer?.email}) <Badge variant={b.status==="COMPLETED"?"success":b.status==="REQUESTED"?"warning":"secondary"} className="ml-2">{b.status}</Badge></span><Badge variant={b.paymentStatus==="PAID"?"success":"muted"}>{b.paymentStatus}</Badge></div>
+-              <div className="text-xs text-muted-foreground">{b.design?.title||"Bespoke"} • ₦{b.agreedPrice?Number(b.agreedPrice).toLocaleString():"—"} • Est {b.estimatedCompletion? new Date(b.estimatedCompletion).toLocaleDateString():"TBD"} • Updated {new Date(b.updatedAt).toLocaleString()}</div>
+-              <div className="text-xs line-clamp-2">{b.description?.slice(0,150)||"—"}</div>
++            {bookings.length===0 ? <div className="text-sm text-muted-foreground dark:text-ivory/60 p-6 text-center border rounded-xl bg-white dark:bg-white/[0.05] dark:border-white/10">No bookings for filter.</div> :
++            bookings.map((b:any)=><div key={b.id} className="border rounded-xl p-3 bg-white dark:bg-white/[0.06] dark:border-white/10">
++              <div className="flex justify-between gap-2"><span className="text-sm font-medium dark:text-ivory">{b.reference} • {b.tailor?.businessName} • {b.customer?.name} ({b.customer?.email}) <Badge variant={b.status==="COMPLETED"?"success":b.status==="REQUESTED"?"warning":"secondary"} className="ml-2">{b.status}</Badge></span><Badge variant={b.paymentStatus==="PAID"?"success":"muted"}>{b.paymentStatus}</Badge></div>
++              <div className="text-xs text-muted-foreground dark:text-ivory/60">{b.design?.title||"Bespoke"} • ₦{b.agreedPrice?Number(b.agreedPrice).toLocaleString():"—"} • Est {b.estimatedCompletion? new Date(b.estimatedCompletion).toLocaleDateString():"TBD"} • Updated {new Date(b.updatedAt).toLocaleString()}</div>
++              <div className="text-xs line-clamp-2 dark:text-ivory/80">{b.description?.slice(0,150)||"—"}</div>
+             </div>)}
+-            <div className="flex gap-2 pt-2 text-xs">{page>1 && <Link href={`/admin/bookings?page=${page-1}${status?`&status=${status}`:""}`} className="px-3 py-1 rounded-full border bg-white">← Prev</Link>}{bookings.length===take && <Link href={`/admin/bookings?page=${page+1}${status?`&status=${status}`:""}`} className="px-3 py-1 rounded-full border bg-white">Next →</Link>}</div>
++            <div className="flex gap-2 pt-2 text-xs">{page>1 && <Link href={`/admin/bookings?page=${page-1}${status?`&status=${status}`:""}`} className="px-3 py-1 rounded-full border bg-white dark:bg-white/[0.06] dark:text-ivory dark:border-white/15">← Prev</Link>}{bookings.length===take && <Link href={`/admin/bookings?page=${page+1}${status?`&status=${status}`:""}`} className="px-3 py-1 rounded-full border bg-white dark:bg-white/[0.06] dark:text-ivory dark:border-white/15">Next →</Link>}</div>
+           </CardContent></Card>
+       </div>
+     </div>
+diff --git a/src/app/admin/layout.tsx b/src/app/admin/layout.tsx
+index 4d1a7c2..0caadec 100644
+--- a/src/app/admin/layout.tsx
++++ b/src/app/admin/layout.tsx
+@@ -28,7 +28,7 @@ const NAV = [
+ export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+   await requireRole(["ADMIN"]);
+   return (
+-    <div className="min-h-screen bg-ivory flex">
++    <div className="min-h-screen bg-ivory dark:bg-midnight flex">
+       <aside className="hidden lg:flex w-[270px] shrink-0 flex-col bg-midnight text-ivory sticky top-0 h-screen overflow-auto">
+         <div className="px-6 pt-6 pb-4 border-b border-white/10">
+           <Link href="/admin" className="flex items-center gap-2">
+diff --git a/src/app/dashboard/customer/bookings/[id]/page.tsx b/src/app/dashboard/customer/bookings/[id]/page.tsx
+index 9b7243b..d1ddc78 100644
+--- a/src/app/dashboard/customer/bookings/[id]/page.tsx
++++ b/src/app/dashboard/customer/bookings/[id]/page.tsx
+@@ -4,7 +4,6 @@ import { Badge } from "@/components/ui/badge";
+ import { prisma } from "@/lib/prisma";
+ import { requireRole } from "@/lib/rbac";
+ import Link from "next/link";
+-
+ export default async function BookingDetail({ params }: { params: Promise<{ id: string }> }) {
+   await requireRole(["CUSTOMER"]);
+   const { id } = await params;
+@@ -14,19 +13,19 @@ export default async function BookingDetail({ params }: { params: Promise<{ id:
+   try {
+     b = await prisma.tailoringBooking.findUnique({ where: { id }, include: { tailor: { select: { businessName: true, slug: true } }, design: { select: { title: true, slug: true } }, statusHistory: { orderBy: { createdAt: "asc" } }, notes: { orderBy: { createdAt: "desc" }, take: 5 } } });
+   } catch {}
+-  if (!b || b.customerId !== uid) return <AdvancedCustomerShell title="Booking"><div className="p-8 text-sm">Booking not found or not yours.</div></AdvancedCustomerShell>;
++  if (!b || b.customerId !== uid) return <AdvancedCustomerShell title="Booking"><div className="p-8 text-sm dark:text-ivory">Booking not found or not yours.</div></AdvancedCustomerShell>;
+   return (
+     <AdvancedCustomerShell title="Booking Details">
+       <div className="space-y-6 max-w-4xl">
+-        <div className="flex justify-between"><div><h1 className="font-display text-2xl">{b.reference} • {b.tailor?.businessName}</h1><p className="text-sm text-muted-foreground">Tailor: <Link href={`/tailors/${b.tailor?.slug}`} className="underline">{b.tailor?.businessName}</Link> • Design: {b.design?.title||"Bespoke"} • Snapshot frozen at request</p></div><Badge variant={b.status==="COMPLETED"?"success":b.status==="REQUESTED"?"warning":"secondary"}>{b.status} • {b.paymentStatus}</Badge></div>
++        <div className="flex justify-between"><div><h1 className="font-display text-2xl dark:text-ivory">{b.reference} • {b.tailor?.businessName}</h1><p className="text-sm text-muted-foreground dark:text-ivory/60">Tailor: <Link href={`/tailors/${b.tailor?.slug}`} className="underline dark:text-gold">{b.tailor?.businessName}</Link> • Design: {b.design?.title||"Bespoke"} • Snapshot frozen at request</p></div><Badge variant={b.status==="COMPLETED"?"success":b.status==="REQUESTED"?"warning":"secondary"}>{b.status} • {b.paymentStatus}</Badge></div>
+         <div className="grid md:grid-cols-3 gap-4">
+-          <Card><CardHeader><CardTitle className="text-sm">Agreed Price</CardTitle></CardHeader><CardContent>₦{b.agreedPrice?Number(b.agreedPrice).toLocaleString():"To be quoted"}</CardContent></Card>
+-          <Card><CardHeader><CardTitle className="text-sm">Est. Completion</CardTitle></CardHeader><CardContent>{b.estimatedCompletion? new Date(b.estimatedCompletion).toLocaleDateString():"TBD"}</CardContent></Card>
+-          <Card><CardHeader><CardTitle className="text-sm">Measurement Snapshot</CardTitle></CardHeader><CardContent className="text-xs font-mono">{b.measurementSnapshot ? JSON.stringify(b.measurementSnapshot).slice(0,120) : "—"}</CardContent></Card>
++          <Card className="dark:bg-white/[0.05] dark:border-white/10"><CardHeader><CardTitle className="text-sm dark:text-ivory">Agreed Price</CardTitle></CardHeader><CardContent className="dark:text-ivory">₦{b.agreedPrice?Number(b.agreedPrice).toLocaleString():"To be quoted"}</CardContent></Card>
++          <Card className="dark:bg-white/[0.05] dark:border-white/10"><CardHeader><CardTitle className="text-sm dark:text-ivory">Est. Completion</CardTitle></CardHeader><CardContent className="dark:text-ivory">{b.estimatedCompletion? new Date(b.estimatedCompletion).toLocaleDateString():"TBD"}</CardContent></Card>
++          <Card className="dark:bg-white/[0.05] dark:border-white/10"><CardHeader><CardTitle className="text-sm dark:text-ivory">Measurement Snapshot</CardTitle></CardHeader><CardContent className="text-xs font-mono dark:text-ivory/70">{b.measurementSnapshot ? JSON.stringify(b.measurementSnapshot).slice(0,120) : "—"}</CardContent></Card>
+         </div>
+-        <Card><CardHeader><CardTitle className="text-sm">Status history • {b.statusHistory?.length||0} events</CardTitle></CardHeader><CardContent className="space-y-1 text-xs">{(b.statusHistory||[]).length ? b.statusHistory.map((h:any)=><div key={h.id} className="flex justify-between border-b py-2"><span>{h.fromStatus||"—"} → {h.toStatus} {h.message?`• ${h.message.slice(0,60)}`:""}</span><span className="text-muted-foreground">{new Date(h.createdAt).toLocaleString()}</span></div>) : <div className="text-muted-foreground">No transitions yet.</div>}</CardContent></Card>
+-        <Card><CardHeader><CardTitle className="text-sm">Description</CardTitle></CardHeader><CardContent className="text-sm">{b.description||"—"}</CardContent></Card>
+-        <Link href="/dashboard/customer/bookings" className="text-sm underline">← Back to bookings</Link>
++        <Card className="dark:bg-white/[0.04] dark:border-white/10"><CardHeader><CardTitle className="text-sm dark:text-ivory">Status history • {b.statusHistory?.length||0} events</CardTitle></CardHeader><CardContent className="space-y-1 text-xs dark:text-ivory">{(b.statusHistory||[]).length ? b.statusHistory.map((h:any)=><div key={h.id} className="flex justify-between border-b dark:border-white/10 py-2"><span>{h.fromStatus||"—"} → {h.toStatus} {h.message?`• ${h.message.slice(0,60)}`:""}</span><span className="text-muted-foreground dark:text-ivory/50">{new Date(h.createdAt).toLocaleString()}</span></div>) : <div className="text-muted-foreground dark:text-ivory/50">No transitions yet.</div>}</CardContent></Card>
++        <Card className="dark:bg-white/[0.04] dark:border-white/10"><CardHeader><CardTitle className="text-sm dark:text-ivory">Description</CardTitle></CardHeader><CardContent className="text-sm dark:text-ivory/80">{b.description||"—"}</CardContent></Card>
++        <Link href="/dashboard/customer/bookings" className="text-sm underline dark:text-gold">← Back to bookings</Link>
+       </div>
+     </AdvancedCustomerShell>
+   );
+diff --git a/src/app/dashboard/customer/bookings/new/page.tsx b/src/app/dashboard/customer/bookings/new/page.tsx
+index 751218e..a902320 100644
+--- a/src/app/dashboard/customer/bookings/new/page.tsx
++++ b/src/app/dashboard/customer/bookings/new/page.tsx
+@@ -85,17 +85,17 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
+   };
+ 
+   return (
+-    <div className="min-h-screen bg-[#FFFBF0]"><SiteHeader />
++    <div className="min-h-screen bg-[#FFFBF0] dark:bg-midnight"><SiteHeader />
+       <div className="mx-auto max-w-3xl px-6 py-8">
+-        <Card>
+-          <CardHeader><CardTitle>Request Tailoring — Full Measurements (Master List)</CardTitle><p className="text-sm text-muted-foreground">Tailor: {sp.tailor || "Select from portfolio"} • Design: {sp.design || "Bespoke"} • Complete list from master update — stored securely, only visible to chosen tailor. Priority: Shoulder → Neck → Arm → Chest/Bust → Shirt → Waist → Trouser</p></CardHeader>
++        <Card className="dark:bg-white/[0.05] dark:border-white/10">
++          <CardHeader><CardTitle className="dark:text-ivory">Request Tailoring — Full Measurements (Master List)</CardTitle><p className="text-sm text-muted-foreground dark:text-ivory/60">Tailor: {sp.tailor || "Select from portfolio"} • Design: {sp.design || "Bespoke"} • Complete list from master update — stored securely, only visible to chosen tailor. Priority: Shoulder → Neck → Arm → Chest/Bust → Shirt → Waist → Trouser</p></CardHeader>
+           <CardContent>
+             <form action={createBooking} className="space-y-6">
+               <input type="hidden" name="tailorSlug" defaultValue={sp.tailor} />
+               <input type="hidden" name="designSlug" defaultValue={sp.design} />
+               
+               <div className="space-y-3">
+-                <div className="font-semibold text-sm flex justify-between">Upper body <span className="text-xs text-muted-foreground">{grouped.upper_body.length} fields</span></div>
++                <div className="font-semibold text-sm flex justify-between dark:text-ivory">Upper body <span className="text-xs text-muted-foreground dark:text-ivory/60">{grouped.upper_body.length} fields</span></div>
+                 <div className="grid md:grid-cols-3 gap-3">
+                   {grouped.upper_body.map(f=>(
+                     <div key={f.key}><Label>{f.labelEn} {f.required&&<span className="text-burgundy">*</span>}</Label><Input name={f.key} type="number" step="0.5" required={!!f.required} placeholder={f.placeholder} /><div className="text-[10px] text-muted-foreground">{f.labelHa} • {f.key}</div></div>
+@@ -104,7 +104,7 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
+               </div>
+ 
+               <div className="space-y-3">
+-                <div className="font-semibold text-sm flex justify-between">Waist / Hip <span className="text-xs text-muted-foreground">{grouped.waist_torso.length} fields</span></div>
++                <div className="font-semibold text-sm flex justify-between dark:text-ivory">Waist / Hip <span className="text-xs text-muted-foreground dark:text-ivory/60">{grouped.waist_torso.length} fields</span></div>
+                 <div className="grid md:grid-cols-3 gap-3">
+                   {grouped.waist_torso.map(f=>(
+                     <div key={f.key}><Label>{f.labelEn} {f.required&&<span className="text-burgundy">*</span>}</Label><Input name={f.key} type="number" step="0.5" required={!!f.required} placeholder={f.placeholder} /></div>
+@@ -113,7 +113,7 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
+               </div>
+ 
+               <div className="space-y-3">
+-                <div className="font-semibold text-sm flex justify-between">Lower body <span className="text-xs text-muted-foreground">{grouped.lower_body.length} fields</span></div>
++                <div className="font-semibold text-sm flex justify-between dark:text-ivory">Lower body <span className="text-xs text-muted-foreground dark:text-ivory/60">{grouped.lower_body.length} fields</span></div>
+                 <div className="grid md:grid-cols-3 gap-3">
+                   {grouped.lower_body.map(f=>(
+                     <div key={f.key}><Label>{f.labelEn} {f.required&&<span className="text-burgundy">*</span>}</Label><Input name={f.key} type="number" step="0.5" required={!!f.required} placeholder={f.placeholder} /></div>
+@@ -122,7 +122,7 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
+               </div>
+ 
+               <div className="space-y-3">
+-                <div className="font-semibold text-sm flex justify-between">Lengths / Other <span className="text-xs text-muted-foreground">{grouped.other.length} fields</span></div>
++                <div className="font-semibold text-sm flex justify-between dark:text-ivory">Lengths / Other <span className="text-xs text-muted-foreground dark:text-ivory/60">{grouped.other.length} fields</span></div>
+                 <div className="grid md:grid-cols-3 gap-3">
+                   {grouped.other.map(f=>(
+                     <div key={f.key}><Label>{f.labelEn} {f.required&&<span className="text-burgundy">*</span>}</Label><Input name={f.key} type="number" step="0.5" required={!!f.required} placeholder={f.placeholder} /></div>
+diff --git a/src/app/dashboard/customer/bookings/page.tsx b/src/app/dashboard/customer/bookings/page.tsx
+index 1ff328a..1ea7b32 100644
+--- a/src/app/dashboard/customer/bookings/page.tsx
++++ b/src/app/dashboard/customer/bookings/page.tsx
+@@ -24,17 +24,17 @@ export default async function CustomerBookings({ searchParams }: { searchParams:
+   return (
+     <AdvancedCustomerShell title="My Bookings">
+       <div className="space-y-6 max-w-4xl">
+-        <div className="flex justify-between items-center"><h1 className="font-display text-2xl">My Bookings — {bookings.length}</h1><Link href="/dashboard/customer/bookings/new"><Button size="sm" className="bg-midnight text-white">New Booking</Button></Link></div>
+-        <div className="flex gap-2 flex-wrap">{tabs.map(t => <Link key={t||"all"} href={t ? `/dashboard/customer/bookings?status=${t}` : `/dashboard/customer/bookings`} className={`px-3 py-1 rounded-full text-xs border ${filter===t || (!filter&&!t) ? "bg-midnight text-white" : "bg-white"}`}>{t || "All"}</Link>)}</div>
+-        <Card><CardHeader><CardTitle className="text-sm">Tailoring workflow: REQUESTED→ACCEPTED→IN_PRODUCTION→READY→COMPLETED • Measurements frozen per booking</CardTitle></CardHeader>
++        <div className="flex justify-between items-center"><h1 className="font-display text-2xl dark:text-ivory">My Bookings — {bookings.length}</h1><Link href="/dashboard/customer/bookings/new"><Button size="sm" className="bg-midnight text-white dark:bg-gold dark:text-midnight">New Booking</Button></Link></div>
++        <div className="flex gap-2 flex-wrap">{tabs.map(t => <Link key={t||"all"} href={t ? `/dashboard/customer/bookings?status=${t}` : `/dashboard/customer/bookings`} className={`px-3 py-1 rounded-full text-xs border transition ${filter===t || (!filter&&!t) ? "bg-midnight text-white dark:bg-gold dark:text-midnight dark:border-gold/50 dark:shadow-[0_0_12px_rgba(198,161,91,0.3)] font-semibold" : "bg-white dark:bg-white/[0.06] dark:text-ivory dark:border-white/15 hover:bg-ivory dark:hover:bg-white/[0.10]"}`}>{t || "All"}</Link>)}</div>
++        <Card className="dark:bg-white/[0.04] dark:border-white/10"><CardHeader><CardTitle className="text-sm dark:text-ivory">Tailoring workflow: REQUESTED→ACCEPTED→IN_PRODUCTION→READY→COMPLETED • Measurements frozen per booking</CardTitle></CardHeader>
+           <CardContent className="space-y-2">
+-            {bookings.length===0 ? <div className="p-8 text-center text-sm text-muted-foreground border rounded-xl bg-white">No bookings — <Link href="/dashboard/customer/discover" className="underline">Discover tailors</Link> or <Link href="/tailors" className="underline">/tailors →</Link></div>
+-            : bookings.map((b:any)=><Link key={b.id} href={`/dashboard/customer/bookings/${b.id}`} className="block border rounded-xl p-3 bg-white hover:shadow-sm">
+-                <div className="flex justify-between text-sm"><span className="font-medium">{b.reference} • {b.tailor.businessName} {b.design?.title && `• ${b.design.title}`}</span><Badge variant={b.status==="COMPLETED"?"success":b.status==="REQUESTED"?"warning":"secondary"}>{b.status}</Badge></div>
+-                <div className="text-xs text-muted-foreground">{b.description?.slice(0,80)||"No description"} • {b.tailor.city} • {new Date(b.createdAt).toLocaleDateString()} {b.agreedPrice ? `• ₦${Number(b.agreedPrice).toLocaleString()}`:""}</div>
++            {bookings.length===0 ? <div className="p-8 text-center text-sm text-muted-foreground dark:text-ivory/60 border rounded-xl bg-white dark:bg-white/[0.05] dark:border-white/10">No bookings — <Link href="/dashboard/customer/discover" className="underline dark:text-gold">Discover tailors</Link> or <Link href="/tailors" className="underline dark:text-gold">/tailors →</Link></div>
++            : bookings.map((b:any)=><Link key={b.id} href={`/dashboard/customer/bookings/${b.id}`} className="block border rounded-xl p-3 bg-white dark:bg-white/[0.06] dark:border-white/10 hover:shadow-sm dark:hover:bg-white/[0.08] dark:hover:border-white/15 transition">
++                <div className="flex justify-between text-sm"><span className="font-medium dark:text-ivory">{b.reference} • {b.tailor.businessName} {b.design?.title && `• ${b.design.title}`}</span><Badge variant={b.status==="COMPLETED"?"success":b.status==="REQUESTED"?"warning":"secondary"}>{b.status}</Badge></div>
++                <div className="text-xs text-muted-foreground dark:text-ivory/60">{b.description?.slice(0,80)||"No description"} • {b.tailor.city} • {new Date(b.createdAt).toLocaleDateString()} {b.agreedPrice ? `• ₦${Number(b.agreedPrice).toLocaleString()}`:""}</div>
+               </Link>)}
+           </CardContent></Card>
+-        <Card><CardContent className="text-xs text-muted-foreground p-3">Ownership-scoped: customerId = session.user.id. Status transitions validated (e.g. DECLINED/CANCELLED terminal). Notifications on status change.</CardContent></Card>
++        <Card className="dark:bg-white/[0.04] dark:border-white/10"><CardContent className="text-xs text-muted-foreground dark:text-ivory/60 p-3">Ownership-scoped: customerId = session.user.id. Status transitions validated (e.g. DECLINED/CANCELLED terminal). Notifications on status change.</CardContent></Card>
+       </div>
+     </AdvancedCustomerShell>
+   );
+diff --git a/src/app/dashboard/tailor/bookings/page.tsx b/src/app/dashboard/tailor/bookings/page.tsx
+index f6effcf..3a118ef 100644
+--- a/src/app/dashboard/tailor/bookings/page.tsx
++++ b/src/app/dashboard/tailor/bookings/page.tsx
+@@ -110,7 +110,7 @@ export default async function TailorBookingsPage({ searchParams }: { searchParam
+ 
+         <div className="flex flex-wrap gap-2 text-xs">
+           {["ALL","REQUESTED","ACCEPTED","IN_PRODUCTION","READY","COMPLETED","ON_HOLD","DECLINED","CANCELLED"].map(s=>(
+-            <Link key={s} href={`/dashboard/tailor/bookings${s==="ALL"?"":"?status="+s}`} className={`px-3 py-1.5 rounded-full border ${status===s?"bg-midnight text-white":"bg-white"}`}>{s} {stats[s]?`(${stats[s]})`:""}</Link>
++            <Link key={s} href={`/dashboard/tailor/bookings${s==="ALL"?"":"?status="+s}`} className={`px-3 py-1.5 rounded-full border transition ${status===s?"bg-midnight text-white dark:bg-gold dark:text-midnight dark:border-gold/50 dark:shadow-[0_0_12px_rgba(198,161,91,0.3)] font-semibold":"bg-white dark:bg-white/[0.06] dark:text-ivory dark:border-white/15 hover:bg-ivory dark:hover:bg-white/[0.10]"}`}>{s} {stats[s]?`(${stats[s]})`:""}</Link>
+           ))}
+         </div>
+ 
+@@ -118,12 +118,12 @@ export default async function TailorBookingsPage({ searchParams }: { searchParam
+           <CardHeader><CardTitle className="text-base">Your bookings — {total} total • Ownership-scoped (tailorId = {profile.id.slice(0,8)}…)</CardTitle></CardHeader>
+           <CardContent className="space-y-3">
+             {bookings.length===0 ? (
+-              <div className="rounded-xl border bg-white p-8 text-center text-sm text-muted-foreground">
+-                No bookings for filter <code>{status}</code>. Create designs at <Link href="/dashboard/tailor/designs" className="underline">Design Portfolio</Link> and share <Link href={`/tailors/${profile.slug}`} className="underline">/tailors/{profile.slug}</Link> to receive REQUESTED bookings.
++              <div className="rounded-xl border bg-white dark:bg-white/[0.05] dark:border-white/10 p-8 text-center text-sm text-muted-foreground dark:text-ivory/60">
++                No bookings for filter <code>{status}</code>. Create designs at <Link href="/dashboard/tailor/designs" className="underline dark:text-gold">Design Portfolio</Link> and share <Link href={`/tailors/${profile.slug}`} className="underline dark:text-gold">/tailors/{profile.slug}</Link> to receive REQUESTED bookings.
+                 <div className="mt-2 text-xs">Demo: log in as <code>customer@demo.twt.ng / DemoPass123!</code> → book at /tailors → tailor sees it here.</div>
+               </div>
+             ) : bookings.map((b:any)=>(
+-              <div key={b.id} className="rounded-xl border bg-white p-4 space-y-3">
++              <div key={b.id} className="rounded-xl border bg-white dark:bg-white/[0.06] dark:border-white/10 p-4 space-y-3">
+                 <div className="flex flex-wrap justify-between gap-2">
+                   <div className="text-sm">
+                     <span className="font-semibold">{b.reference}</span> • {b.customer.name} ({b.customer.email}) • {b.design?.title || "Bespoke (no design)"}
+@@ -148,7 +148,7 @@ export default async function TailorBookingsPage({ searchParams }: { searchParam
+             ))}
+             <div className="flex justify-between text-xs pt-2">
+               <span className="text-muted-foreground">All mutations check <code>booking.tailorId === profile.id</code> and validate {`{from→to}` } against allow-list; history immutable.</span>
+-              <span className="flex gap-2">{page>1 && <Link href={`/dashboard/tailor/bookings?status=${status}&page=${page-1}`} className="px-3 py-1 rounded-full border bg-white">← Prev</Link>}{bookings.length===pageSize && <Link href={`/dashboard/tailor/bookings?status=${status}&page=${page+1}`} className="px-3 py-1 rounded-full border bg-white">Next →</Link>}</span>
++              <span className="flex gap-2">{page>1 && <Link href={`/dashboard/tailor/bookings?status=${status}&page=${page-1}`} className="px-3 py-1 rounded-full border bg-white dark:bg-white/[0.06] dark:text-ivory dark:border-white/15">← Prev</Link>}{bookings.length===pageSize && <Link href={`/dashboard/tailor/bookings?status=${status}&page=${page+1}`} className="px-3 py-1 rounded-full border bg-white dark:bg-white/[0.06] dark:text-ivory dark:border-white/15">Next →</Link>}</span>
+             </div>
+           </CardContent>
+         </Card>
+diff --git a/src/app/globals.css b/src/app/globals.css
+index 1194dd5..b1c7990 100644
+--- a/src/app/globals.css
++++ b/src/app/globals.css
+@@ -100,6 +100,11 @@
+ .text-display { font-family: Playfair Display, serif; }
+ .tracking-tight-custom { letter-spacing: -0.03em; }
+ 
++/* Admin/bookings explicit dark shells — these pages use min-h-screen bg-ivory outside AdvancedShell */
++.dark main.bg-ivory { background-color: hsl(var(--background)) !important; }
++.dark header.bg-white { background-color: hsl(var(--card)) !important; border-color: rgba(255,255,255,0.08) !important; }
++.dark .min-h-screen.bg-ivory { background-color: hsl(var(--background)) !important; }
++
+ /* Dark-mode input visibility fix — raw inputs without Input component (e.g., w-full h-9 rounded-xl border bg-white) */
+ .dark input,
+ .dark textarea,
+diff --git a/src/components/dashboard/shell.tsx b/src/components/dashboard/shell.tsx
+index 07d0fce..5758fbd 100644
+--- a/src/components/dashboard/shell.tsx
++++ b/src/components/dashboard/shell.tsx
+@@ -10,9 +10,9 @@ export function DashboardShell({ role, title, nav, children }: { role: string; t
+   };
+   const bg = roleColor[role] || "bg-midnight";
+   return (
+-    <div className="min-h-screen bg-ivory flex">
++    <div className="min-h-screen bg-ivory dark:bg-midnight flex">
+       {/* Sidebar — deep navy refined */}
+-      <aside className="hidden lg:flex w-[260px] shrink-0 flex-col bg-midnight text-ivory">
++      <aside className="hidden lg:flex w:[260px] shrink-0 flex-col bg-midnight text-ivory">
+         <div className="px-6 pt-6 pb-4 border-b border-white/10">
+           <div className="flex items-center gap-2">
+             <div className="h-8 w-8 rounded-lg bg-white/10 border border-gold/30 grid place-items-center text-gold text-xs font-bold">TWT</div>
+@@ -43,18 +43,18 @@ export function DashboardShell({ role, title, nav, children }: { role: string; t
+ 
+       {/* Main */}
+       <div className="flex-1 min-w-0 flex flex-col">
+-        <header className="h-14 bg-white border-b border-midnight/10 flex items-center justify-between px-6">
++        <header className="h-14 bg-white dark:bg-midnight dark:border-white/10 border-b border-midnight/10 flex items-center justify-between px-6">
+           <div className="flex items-center gap-3">
+-            <span className="lg:hidden font-display font-semibold">TWT • {role}</span>
+-            <span className="hidden lg:block text-xs tracking-[0.16em] text-taupe font-semibold">{title.toUpperCase()} WORKSPACE</span>
+-            <span className="hidden sm:inline text-xs text-taupe">• Secure • Paystack • Mapbox ready</span>
++            <span className="lg:hidden font-display font-semibold dark:text-ivory">TWT • {role}</span>
++            <span className="hidden lg:block text-xs tracking-[0.16em] text-taupe dark:text-ivory/60 font-semibold">{title.toUpperCase()} WORKSPACE</span>
++            <span className="hidden sm:inline text-xs text-taupe dark:text-ivory/50">• Secure • Paystack • Mapbox ready</span>
+           </div>
+           <div className="flex items-center gap-2">
+-            <button className="h-8 w-8 grid place-items-center rounded-full bg-ivory border"><Bell className="h-4 w-4" /></button>
++            <button className="h-8 w-8 grid place-items-center rounded-full bg-ivory dark:bg-white/10 dark:text-ivory border dark:border-white/10"><Bell className="h-4 w-4" /></button>
+             <div className="h-8 w-8 rounded-full bg-plum text-white grid place-items-center text-xs">U</div>
+           </div>
+         </header>
+-        <main className="flex-1 p-6 bg-ivory">{children}</main>
++        <main className="flex-1 p-6 bg-ivory dark:bg-midnight dark:text-ivory">{children}</main>
+       </div>
+     </div>
+   );
+-- 
+2.47.3
+

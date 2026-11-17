@@ -1,4 +1,3 @@
-import { AdvancedTailorShell } from "@/components/dashboard/AdvancedShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/rbac";
@@ -13,7 +12,6 @@ export default async function MessagesPage() {
     threads = notes;
   } catch {}
   return (
-    <AdvancedTailorShell title="Messages">
       <div className="space-y-6 max-w-3xl">
         <div><h1 className="font-display text-2xl">Messages</h1><p className="text-sm text-muted-foreground">Customer conversations • Booking-linked • Notify on reply</p></div>
         <Card><CardHeader><CardTitle className="text-sm">Recent threads (booking-linked)</CardTitle></CardHeader>
@@ -23,6 +21,5 @@ export default async function MessagesPage() {
           </CardContent></Card>
         <Card><CardContent className="text-xs text-muted-foreground p-4">Full Conversation/Message thread UI (Conversation+Message models) next — currently bridged via notifications. All messages are RBAC-scoped to participants.</CardContent></Card>
       </div>
-    </AdvancedTailorShell>
-  );
+    )
 }

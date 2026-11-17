@@ -1,4 +1,3 @@
-import { AdvancedTailorShell } from "@/components/dashboard/AdvancedShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/prisma";
@@ -27,7 +26,6 @@ export default async function TailorNotifications() {
   let items: any[] = [];
   try { items = await prisma.notification.findMany({ where:{ userId:(session.user as any).id }, orderBy:{ createdAt:"desc" }, take:30 }); } catch {}
   return (
-    <AdvancedTailorShell title="Notifications">
       <div className="space-y-6 max-w-3xl">
         <div className="flex justify-between"><h1 className="font-display text-2xl">Notifications</h1><form action={markAll}><Button size="sm" variant="outline" className="h-7 text-xs">Mark all read</Button></form></div>
         <Card><CardHeader><CardTitle className="text-sm">Recent • New bookings, payments, reviews, deadlines</CardTitle></CardHeader>
@@ -39,6 +37,5 @@ export default async function TailorNotifications() {
             </div>)}
           </CardContent></Card>
       </div>
-    </AdvancedTailorShell>
-  );
+    )
 }

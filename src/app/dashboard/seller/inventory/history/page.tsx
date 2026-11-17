@@ -1,4 +1,3 @@
-import { AdvancedSellerShell } from "@/components/dashboard/AdvancedSellerShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/rbac";
@@ -8,7 +7,7 @@ export default async function StockHistory({ searchParams }: { searchParams: Pro
   await requireRole(["FABRIC_SELLER"]);
   const session = await (await import("@/lib/auth")).auth();
   const profile: any = await prisma.sellerProfile.findUnique({ where: { userId: (session as any).user.id } });
-  if (!profile) return <AdvancedSellerShell title="Stock History"><div className="p-6">No profile</div></AdvancedSellerShell>;
+  if (!profile) return (<div className="p-6">No profile</div>)
   const page = Math.max(1, parseInt(((await searchParams)?.page)||"1") || 1);
   const take = 20;
   const productIds = await prisma.fabricProduct.findMany({ where: { sellerId: profile.id }, select: { id: true } }).then(ps=> ps.map(p=>p.id));
@@ -21,7 +20,6 @@ export default async function StockHistory({ searchParams }: { searchParams: Pro
     moves = moves.map(m => ({ ...m, productName: map.get(m.productId) || m.productId.slice(0,8) }));
   } catch {}
   return (
-    <AdvancedSellerShell title="Stock History">
       <div className="space-y-6 max-w-4xl">
         <div className="flex justify-between"><div><h1 className="font-display text-2xl">Stock Movement History</h1><p className="text-sm text-muted-foreground">Every adjustment • Before→after via delta • Who (audit), when</p></div><Link href="/dashboard/seller/inventory" className="text-sm underline">← Inventory</Link></div>
         <Card><CardHeader><CardTitle className="text-sm">Movements • {total} total • page {page}</CardTitle></CardHeader>
@@ -31,6 +29,5 @@ export default async function StockHistory({ searchParams }: { searchParams: Pro
             <div className="flex gap-2 pt-2 text-xs">{page>1 && <Link href={`/dashboard/seller/inventory/history?page=${page-1}`} className="px-3 py-1 rounded-full border bg-white">← Prev</Link>}{moves.length===take && <Link href={`/dashboard/seller/inventory/history?page=${page+1}`} className="px-3 py-1 rounded-full border bg-white">Next →</Link>}</div>
           </CardContent></Card>
       </div>
-    </AdvancedSellerShell>
-  );
+    )
 }

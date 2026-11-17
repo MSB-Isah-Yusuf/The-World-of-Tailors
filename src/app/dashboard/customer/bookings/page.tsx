@@ -1,4 +1,3 @@
-import { AdvancedCustomerShell } from "@/components/dashboard/AdvancedCustomerShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,7 +21,6 @@ export default async function CustomerBookings({ searchParams }: { searchParams:
   } catch {}
   const tabs = ["", "REQUESTED", "ACCEPTED", "IN_PRODUCTION", "READY", "COMPLETED"];
   return (
-    <AdvancedCustomerShell title="My Bookings">
       <div className="space-y-6 max-w-4xl">
         <div className="flex justify-between items-center"><h1 className="font-display text-2xl dark:text-ivory">My Bookings — {bookings.length}</h1><Link href="/dashboard/customer/bookings/new"><Button size="sm" className="bg-midnight text-white dark:bg-gold dark:text-midnight">New Booking</Button></Link></div>
         <div className="flex gap-2 flex-wrap">{tabs.map(t => <Link key={t||"all"} href={t ? `/dashboard/customer/bookings?status=${t}` : `/dashboard/customer/bookings`} className={`px-3 py-1 rounded-full text-xs border transition ${filter===t || (!filter&&!t) ? "bg-midnight text-white dark:bg-gold dark:text-midnight dark:border-gold/50 dark:shadow-[0_0_12px_rgba(198,161,91,0.3)] font-semibold" : "bg-white dark:bg-white/[0.06] dark:text-ivory dark:border-white/15 hover:bg-ivory dark:hover:bg-white/[0.10]"}`}>{t || "All"}</Link>)}</div>
@@ -36,6 +34,5 @@ export default async function CustomerBookings({ searchParams }: { searchParams:
           </CardContent></Card>
         <Card className="dark:bg-white/[0.04] dark:border-white/10"><CardContent className="text-xs text-muted-foreground dark:text-ivory/60 p-3">Ownership-scoped: customerId = session.user.id. Status transitions validated (e.g. DECLINED/CANCELLED terminal). Notifications on status change.</CardContent></Card>
       </div>
-    </AdvancedCustomerShell>
-  );
+    )
 }

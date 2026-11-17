@@ -1,4 +1,3 @@
-import { AdvancedSellerShell } from "@/components/dashboard/AdvancedSellerShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,7 +8,7 @@ import { requireRole } from "@/lib/rbac";
 export default async function SellerDashboard() {
   const session = await requireRole(["FABRIC_SELLER"]);
   const profile = await prisma.sellerProfile.findUnique({ where:{ userId: (session.user as any).id } });
-  if (!profile) return <AdvancedSellerShell title="Overview"><Card><CardContent className="p-6 text-sm">No seller profile — <Link href="/register/seller" className="underline">create one</Link></CardContent></Card></AdvancedSellerShell>;
+  if (!profile) return (<Card><CardContent className="p-6 text-sm">No seller profile — <Link href="/register/seller" className="underline">create one</Link></CardContent></Card>)
 
   let stats={ products:0, published:0, lowStock:0, pending:0, inTransit:0 };
   let recentOrders:any[]=[];
@@ -26,7 +25,6 @@ export default async function SellerDashboard() {
   } catch {}
 
   return (
-    <AdvancedSellerShell title="Overview">
       <div className="space-y-6">
         <div className="flex justify-between"><div><h1 className="font-display text-2xl">Seller Overview — {profile.businessName}</h1><p className="text-sm text-muted-foreground">No measurement access — strictly ownership-scoped • Verified: <Badge variant={profile.businessStatus==="APPROVED"?"success":"warning"}>{profile.businessStatus}</Badge> {profile.isPublished?<Badge variant="gold" className="ml-2">Published</Badge>:<Badge variant="secondary" className="ml-2">Hidden</Badge>} • <Link href={`/sellers/${profile.slug}`} className="text-xs underline ml-2">View /sellers/{profile.slug} →</Link></p></div><Link href="/dashboard/seller/profile"><Button size="sm" variant="outline">Edit profile</Button></Link></div>
         <div className="grid md:grid-cols-4 gap-4">
@@ -44,6 +42,5 @@ export default async function SellerDashboard() {
           </CardContent></Card>
         <Card><CardHeader><CardTitle className="text-base">Inventory — atomic updates + movement history</CardTitle></CardHeader><CardContent className="text-sm text-muted-foreground">Stock quantities require inventory movement records. Reserved vs available tracked. No direct stock edits without audit. See <Link href="/dashboard/seller/inventory" className="underline">Inventory →</Link></CardContent></Card>
       </div>
-    </AdvancedSellerShell>
-  );
+    )
 }

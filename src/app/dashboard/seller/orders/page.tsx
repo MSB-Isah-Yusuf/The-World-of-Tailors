@@ -1,4 +1,3 @@
-import { AdvancedSellerShell } from "@/components/dashboard/AdvancedSellerShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,7 +31,7 @@ export default async function SellerOrders({ searchParams }: { searchParams: Pro
   const status= (sp?.status||"all").toUpperCase();
   const session= await requireRole(["FABRIC_SELLER"]);
   const profile= await prisma.sellerProfile.findUnique({ where:{ userId:(session.user as any).id } });
-  if(!profile) return <AdvancedSellerShell title="Orders"><div className="p-6">No seller profile</div></AdvancedSellerShell>;
+  if(!profile) return (<div className="p-6">No seller profile</div>)
   let orders:any[]=[];
   try {
     const where:any={ sellerId: profile.id };
@@ -40,7 +39,6 @@ export default async function SellerOrders({ searchParams }: { searchParams: Pro
     orders= await prisma.fabricOrder.findMany({ where, include:{ customer:{select:{name:true,email:true}}, items:true, deliveries:true }, orderBy:{ updatedAt:"desc" }, take:20 });
   } catch {}
   return (
-    <AdvancedSellerShell title="Fabric Orders">
       <div className="space-y-6">
         <div><h1 className="font-display text-2xl">Orders — {profile.businessName}</h1><p className="text-sm text-muted-foreground">PENDING → CONFIRMED → PREPARING → READY_FOR_DISPATCH → IN_TRANSIT → DELIVERED • Inventory reserved atomically</p></div>
         <div className="flex flex-wrap gap-2 text-xs">{["ALL","PENDING","CONFIRMED","PREPARING","READY_FOR_DISPATCH","IN_TRANSIT","DELIVERED","CANCELLED"].map(s=><Link key={s} href={`/dashboard/seller/orders${s==="ALL"?"":"?status="+s}`} className={`px-3 py-1.5 rounded-full border ${status===s?"bg-midnight text-white":"bg-white"}`}>{s}</Link>)}</div>
@@ -53,6 +51,5 @@ export default async function SellerOrders({ searchParams }: { searchParams: Pro
           </div>)}
         </CardContent></Card>
       </div>
-    </AdvancedSellerShell>
-  );
+    )
 }

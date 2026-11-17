@@ -1,4 +1,3 @@
-import { AdvancedSellerShell } from "@/components/dashboard/AdvancedSellerShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { prisma } from "@/lib/prisma";
@@ -16,7 +15,6 @@ export default async function SellerDeliveries() {
     if (ids.length) deliveries = await prisma.delivery.findMany({ where: { fabricOrderId: { in: ids } }, orderBy: { createdAt: "desc" }, take: 20, include: { fabricOrder: { select: { reference: true, deliveryType: true, customer: { select: { name: true } } } } } as any } as any);
   } catch {}
   return (
-    <AdvancedSellerShell title="Deliveries">
       <div className="space-y-6 max-w-4xl">
         <div><h1 className="font-display text-2xl">Deliveries • {profile?.businessName}</h1><p className="text-sm text-muted-foreground">Home delivery vs. to-tailor • Handover tracking • Fabric delivery separate from tailoring production</p></div>
         <Card><CardHeader><CardTitle className="text-sm">Active deliveries • {deliveries.length}</CardTitle></CardHeader>
@@ -28,6 +26,5 @@ export default async function SellerDeliveries() {
             </div>)}
           </CardContent></Card>
       </div>
-    </AdvancedSellerShell>
-  );
+    )
 }

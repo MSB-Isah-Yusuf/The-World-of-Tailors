@@ -1,4 +1,3 @@
-import { DashboardShell } from "@/components/dashboard/shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,7 +35,7 @@ async function saveProfile(formData: FormData) {
 export default async function TailorProfilePage() {
   const session = await requireRole(["TAILOR"]);
   const profile = await prisma.tailorProfile.findUnique({ where: { userId: (session.user as any).id }, include: { user: { select: { name:true,email:true,phone:true } } } });
-  if (!profile) return <DashboardShell role="TAILOR" title="Tailor Business" nav={[{href:"#",label:"Overview"}]}><Card><CardContent className="p-6 text-sm">No tailor profile found. Contact support.</CardContent></Card></DashboardShell>;
+  if (!profile) return (<Card><CardContent className="p-6 text-sm">No tailor profile found. Contact support.</CardContent></Card>)
   const nav = [
     { href: "/dashboard/tailor", label: "Overview" },
     { href: "/dashboard/tailor/customers", label: "Customers" },
@@ -45,9 +44,7 @@ export default async function TailorProfilePage() {
     { href: "/dashboard/tailor/designs", label: "Design Portfolio" },
     { href: "/dashboard/tailor/profile", label: "Profile & Settings" },
   ];
-  return (
-    <DashboardShell role="TAILOR" title="Tailor Business" nav={nav}>
-      <div className="space-y-6 max-w-3xl">
+  return (      <div className="space-y-6 max-w-3xl">
         <div><h1 className="font-display text-2xl">Profile & Settings — {profile.businessName}</h1><p className="text-sm text-muted-foreground">Verification status: <span className="font-semibold">{profile.businessStatus}</span> • Published: {profile.isPublished?"Yes":"No"} • Slug: {profile.slug}</p></div>
         {profile.businessStatus!=="APPROVED" && <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-900">⚠ {profile.businessStatus==="PENDING"?"Pending admin verification — you can manage bookings & designs, but your public page is hidden until APPROVED.":"Your profile is not approved — contact support."} Admin: /admin/verification</div>}
         <Card>
@@ -74,6 +71,5 @@ export default async function TailorProfilePage() {
         </Card>
         <Card><CardHeader><CardTitle className="text-sm">Account</CardTitle></CardHeader><CardContent className="text-sm"><div>Name: {profile.user.name} • Email: {profile.user.email} • Phone: {profile.user.phone||"—"}</div><div className="text-xs text-muted-foreground">Role: TAILOR • Status: APPROVED via admin after verification. Least-privilege RBAC enforced.</div></CardContent></Card>
       </div>
-    </DashboardShell>
-  );
+    )
 }

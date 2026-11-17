@@ -1,4 +1,3 @@
-import { AdvancedTailorShell } from "@/components/dashboard/AdvancedShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,7 +42,7 @@ async function addNote(formData: FormData) {
 export default async function TailorProductionPage() {
   const session = await requireRole(["TAILOR"]);
   const profile: any = await prisma.tailorProfile.findUnique({ where: { userId: (session.user as any).id } });
-  if (!profile) return <AdvancedTailorShell title="Production"><Card><CardContent className="p-6 text-sm">No profile.</CardContent></Card></AdvancedTailorShell>;
+  if (!profile) return (<Card><CardContent className="p-6 text-sm">No profile.</CardContent></Card>)
   let bookings: any[] = [];
   try {
     bookings = await prisma.tailoringBooking.findMany({
@@ -54,7 +53,6 @@ export default async function TailorProductionPage() {
   } catch { bookings = []; }
   const now = Date.now();
   return (
-    <AdvancedTailorShell title="Production Tracking">
       <div className="space-y-6">
         <div><h1 className="font-display text-2xl">Production Tracking — {profile.businessName}</h1><p className="text-sm text-muted-foreground">Kanban pipeline • Progress notes • Status history • Customer notified on milestones</p></div>
         <div className="grid md:grid-cols-3 gap-4 text-xs">
@@ -81,6 +79,5 @@ export default async function TailorProductionPage() {
             })}
           </CardContent></Card>
       </div>
-    </AdvancedTailorShell>
-  );
+    )
 }

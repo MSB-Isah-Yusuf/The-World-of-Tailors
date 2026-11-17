@@ -1,4 +1,3 @@
-import { AdvancedTailorShell } from "@/components/dashboard/AdvancedShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -115,10 +114,8 @@ export default async function TailorDesignsPage({ searchParams }: { searchParams
   const profile = await prisma.tailorProfile.findUnique({ where: { userId } });
   if (!profile) {
     return (
-      <AdvancedTailorShell title="My Designs / Portfolio">
         <Card><CardHeader><CardTitle>Complete your tailor profile</CardTitle></CardHeader><CardContent className="text-sm">Create your business profile before adding designs. <Link href="/dashboard/tailor/profile" className="underline text-plum">Go to Profile →</Link></CardContent></Card>
-      </AdvancedTailorShell>
-    );
+      )
   }
 
   const filter = sp?.filter || "all";
@@ -154,7 +151,6 @@ export default async function TailorDesignsPage({ searchParams }: { searchParams
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
-    <AdvancedTailorShell title="My Designs / Portfolio">
       <div className="space-y-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -253,6 +249,5 @@ export default async function TailorDesignsPage({ searchParams }: { searchParams
 
         <div className="flex justify-between text-xs"><span className="text-muted-foreground">Images stored via STORAGE_PROVIDER (object storage) + metadata in PostgreSQL • Thumbnails generated on publish • Soft-delete preserves booking history</span><span className="flex gap-2">{page>1 && <Link href={`/dashboard/tailor/designs?filter=${filter}&view=${view}&page=${page-1}`} className="px-3 py-1 rounded-full border bg-white">← Prev</Link>}{page<totalPages && <Link href={`/dashboard/tailor/designs?filter=${filter}&view=${view}&page=${page+1}`} className="px-3 py-1 rounded-full border bg-white">Next →</Link>}</span></div>
       </div>
-    </AdvancedTailorShell>
-  );
+    )
 }

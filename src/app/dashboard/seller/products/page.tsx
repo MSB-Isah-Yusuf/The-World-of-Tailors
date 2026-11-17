@@ -1,4 +1,3 @@
-import { AdvancedSellerShell } from "@/components/dashboard/AdvancedSellerShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -48,7 +47,7 @@ export default async function SellerProducts({ searchParams }: { searchParams: P
   const sp= await searchParams;
   const session= await requireRole(["FABRIC_SELLER"]);
   const profile= await prisma.sellerProfile.findUnique({ where:{ userId:(session.user as any).id } });
-  if(!profile) return <AdvancedSellerShell title="Products"><div className="p-6">No seller profile</div></AdvancedSellerShell>;
+  if(!profile) return (<div className="p-6">No seller profile</div>)
   const filter= sp?.filter||"all";
   const q= (sp?.q||"").toLowerCase().trim();
   const page= Math.max(1, parseInt(sp?.page||"1",10)||1);
@@ -64,7 +63,6 @@ export default async function SellerProducts({ searchParams }: { searchParams: P
   } catch { products=[]; }
 
   return (
-    <AdvancedSellerShell title="My Products">
       <div className="space-y-6">
         <div className="flex justify-between"><div><h1 className="font-display text-2xl">My Products — {profile.businessName}</h1><p className="text-sm text-muted-foreground">Ownership-scoped • Inventory movement logged • Delivery to tailor supported</p></div><div className="flex gap-2 text-xs"><span className="px-3 py-1 rounded-full bg-white border">{total} total</span></div></div>
         {sp?.created && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">✓ Product created as draft — publish after verification</div>}
@@ -90,6 +88,5 @@ export default async function SellerProducts({ searchParams }: { searchParams: P
             <CardContent className="flex gap-2"><form action={togglePublish} className="flex-1"><input type="hidden" name="productId" value={p.id}/><Button size="sm" variant={p.isPublished?"outline":"default"} className="w-full h-7 text-xs">{p.isPublished?"Unpublish":"Publish"}</Button></form><Link href={`/fabrics/${p.slug}`} className="flex-1"><Button size="sm" variant="outline" className="w-full h-7 text-xs">View</Button></Link></CardContent></Card>)}
         </div>
       </div>
-    </AdvancedSellerShell>
-  );
+    )
 }

@@ -1,4 +1,3 @@
-import { AdvancedTailorShell } from "@/components/dashboard/AdvancedShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,7 +42,6 @@ export default async function AccountPage() {
     sessions = await prisma.session.findMany({ where: { userId: uid }, orderBy: { expires: "desc" }, take: 5 });
   } catch {}
   return (
-    <AdvancedTailorShell title="Account Settings">
       <div className="space-y-6 max-w-3xl">
         <div><h1 className="font-display text-2xl">Account Settings</h1><p className="text-sm text-muted-foreground">Profile • Password • Sessions • Preferences (theme EN|HA, dark/light via header)</p></div>
         <div className="grid md:grid-cols-2 gap-4">
@@ -65,6 +63,5 @@ export default async function AccountPage() {
             <div className="text-muted-foreground">JWT 7d + httpOnly Secure SameSite • Admin 15m / Tailor 30m inactivity timeouts configurable via Platform Settings next.</div>
           </CardContent></Card>
       </div>
-    </AdvancedTailorShell>
-  );
+    )
 }

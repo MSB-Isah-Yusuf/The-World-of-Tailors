@@ -1,4 +1,3 @@
-import { AdvancedSellerShell } from "@/components/dashboard/AdvancedSellerShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { prisma } from "@/lib/prisma";
@@ -9,10 +8,9 @@ export default async function SellerVerificationPage() {
   await requireRole(["FABRIC_SELLER"]);
   const session = await (await import("@/lib/auth")).auth();
   const profile: any = await prisma.sellerProfile.findUnique({ where: { userId: (session as any).user.id } });
-  if (!profile) return <AdvancedSellerShell title="Verification"><div className="p-6">No seller profile</div></AdvancedSellerShell>;
+  if (!profile) return (<div className="p-6">No seller profile</div>)
   const isApproved = profile.businessStatus === "APPROVED";
   return (
-    <AdvancedSellerShell title="Verification">
       <div className="space-y-6 max-w-3xl">
         <div><h1 className="font-display text-2xl">Verification Status</h1><p className="text-sm text-muted-foreground">Seller verification • Admin approval required to publish products</p></div>
         <Card><CardHeader><CardTitle className="text-sm">Current: <Badge variant={isApproved?"success":profile.businessStatus==="PENDING"?"warning":"burgundy"}>{profile.businessStatus}</Badge> {profile.isPublished ? <Badge variant="gold" className="ml-2">Published</Badge> : <Badge variant="secondary" className="ml-2">Unpublished</Badge>}</CardTitle></CardHeader>
@@ -25,6 +23,5 @@ export default async function SellerVerificationPage() {
             {isApproved ? <div className="text-xs">Your products are searchable on <Link href="/fabrics" className="underline text-plum">/fabrics</Link>. Keep stock accurate.</div> : <div className="text-xs text-amber-700">Publish blocked until APPROVED — drafts saved. Admin will notify on decision.</div>}
           </CardContent></Card>
       </div>
-    </AdvancedSellerShell>
-  );
+    )
 }

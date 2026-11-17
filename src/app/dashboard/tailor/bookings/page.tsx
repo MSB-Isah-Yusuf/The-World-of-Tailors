@@ -1,4 +1,3 @@
-import { DashboardShell } from "@/components/dashboard/shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -54,7 +53,7 @@ export default async function TailorBookingsPage({ searchParams }: { searchParam
   const sp = await searchParams;
   const session = await requireRole(["TAILOR"]);
   const profile = await prisma.tailorProfile.findUnique({ where: { userId: (session.user as any).id } });
-  if (!profile) return <DashboardShell role="TAILOR" title="Tailor Business" nav={[{href:"#",label:"Overview"}]}><Card><CardContent className="p-6 text-sm">No tailor profile — <Link href="/dashboard/tailor/profile" className="underline">create profile</Link></CardContent></Card></DashboardShell>;
+  if (!profile) return (<Card><CardContent className="p-6 text-sm">No tailor profile — <Link href="/dashboard/tailor/profile" className="underline">create profile</Link></CardContent></Card>)
 
   const status = (sp?.status||"all").toUpperCase();
   const q = sp?.q?.toLowerCase().trim()||"";
@@ -93,9 +92,7 @@ export default async function TailorBookingsPage({ searchParams }: { searchParam
     { href: "/dashboard/tailor/profile", label: "Profile & Settings" },
   ];
 
-  return (
-    <DashboardShell role="TAILOR" title="Tailor Business" nav={nav}>
-      <div className="space-y-6">
+  return (      <div className="space-y-6">
         <div>
           <h1 className="font-display text-2xl">Bookings — {profile.businessName}</h1>
           <p className="text-sm text-muted-foreground">Status state-machine validated server-side • Every change records <code>BookingStatusHistory</code> + <code>AuditLog</code> • Only owner tailor can mutate.</p>
@@ -153,6 +150,5 @@ export default async function TailorBookingsPage({ searchParams }: { searchParam
           </CardContent>
         </Card>
       </div>
-    </DashboardShell>
-  );
+    )
 }

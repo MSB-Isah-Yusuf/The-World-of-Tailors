@@ -1,4 +1,3 @@
-import { AdvancedCustomerShell } from "@/components/dashboard/AdvancedCustomerShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { prisma } from "@/lib/prisma";
@@ -31,7 +30,6 @@ export default async function CustomerAddresses(){
   let addresses:any[]=[];
   try { addresses = await prisma.customerAddress.findMany({ where:{ userId: uid }, orderBy:{ createdAt:"desc" } }); } catch{}
   return (
-    <AdvancedCustomerShell title="Addresses">
       <div className="space-y-6 max-w-3xl">
         <h1 className="font-display text-2xl">Delivery Addresses — {addresses.length}</h1>
         <Card><CardHeader><CardTitle className="text-sm">Used at checkout • Default pre-filled • TO_CUSTOMER vs TO_TAILOR toggle at checkout</CardTitle></CardHeader><CardContent className="space-y-3">
@@ -48,6 +46,5 @@ export default async function CustomerAddresses(){
           </form>
         </CardContent></Card>
       </div>
-    </AdvancedCustomerShell>
-  );
+    )
 }

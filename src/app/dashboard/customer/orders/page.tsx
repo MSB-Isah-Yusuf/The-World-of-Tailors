@@ -1,4 +1,3 @@
-import { AdvancedCustomerShell } from "@/components/dashboard/AdvancedCustomerShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { prisma } from "@/lib/prisma";
@@ -12,7 +11,6 @@ export default async function CustomerOrders() {
   let orders:any[]=[];
   try { orders = await prisma.fabricOrder.findMany({ where:{ customerId: uid }, include:{ seller:{select:{businessName:true, city:true, slug:true}}, items:{select:{productName:true, quantity:true, lineTotal:true}} }, orderBy:{createdAt:"desc"}, take:20 }); } catch{}
   return (
-    <AdvancedCustomerShell title="Fabric Orders">
       <div className="space-y-6 max-w-4xl">
         <div className="flex justify-between"><h1 className="font-display text-2xl">Fabric Orders — {orders.length}</h1><Link href="/dashboard/customer/marketplace" className="text-xs underline">Browse fabrics →</Link></div>
         <Card><CardHeader><CardTitle className="text-sm">Orders by seller • PENDING→DELIVERED • Payment PAID via Paystack webhook • Delivery per seller</CardTitle></CardHeader>
@@ -24,6 +22,5 @@ export default async function CustomerOrders() {
             </div>)}
           </CardContent></Card>
       </div>
-    </AdvancedCustomerShell>
-  );
+    )
 }
