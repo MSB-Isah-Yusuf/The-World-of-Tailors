@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { I18nProvider } from "@/lib/i18n";
 
 // Fonts loaded via CSS fallback to avoid Vercel next/font Google fetch failures
 // Using system font stack + editorial web-safe fallback maintains luxury typography without blocking builds
@@ -16,14 +17,14 @@ export const metadata: Metadata = {
 };
 
 function ThemeScript(){
-  const js = `try{const k='twt-theme';const s=localStorage.getItem(k);const m=window.matchMedia('(prefers-color-scheme: dark)').matches;const t=s||'system';const d=t==='system'?m:t==='dark';document.documentElement.classList.toggle('dark',d)}catch(e){}`;
+  const js = `try{const k='twt-theme';const s=localStorage.getItem(k);const m=window.matchMedia('(prefers-color-scheme: dark)').matches;const t=s||'system';const d=t==='system'?m:t==='dark';document.documentElement.classList.toggle('dark',d);const l=localStorage.getItem('twt-lang');if(l)document.documentElement.lang=l.toLowerCase();}catch(e){}`;
   return <script dangerouslySetInnerHTML={{__html:js}} />;
 }
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head><ThemeScript /></head>
-      <body className="min-h-screen bg-ivory text-charcoal antialiased dark:bg-midnight dark:text-ivory">{children}</body>
+      <body className="min-h-screen bg-ivory text-charcoal antialiased dark:bg-midnight dark:text-ivory"><I18nProvider>{children}</I18nProvider></body>
     </html>
   );
 }
