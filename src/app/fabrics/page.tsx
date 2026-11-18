@@ -4,6 +4,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { Input } from "@/components/ui/input";
 import { distanceKm, NIGERIA_STATES } from "@/lib/location-data";
+import { UserAvatar } from "@/components/ui/avatar";
 import { MapPin } from "lucide-react";
 
 export default async function FabricsPage({ searchParams }: { searchParams: Promise<{ q?:string; state?:string; city?:string; lat?:string; lng?:string; distance?:string; fabricType?:string; color?:string; price?:string; inStock?:string; page?:string }> }) {
@@ -18,7 +19,7 @@ export default async function FabricsPage({ searchParams }: { searchParams: Prom
     if (color) where.color = { contains: color, mode:"insensitive" };
     if (sp?.inStock==="true") where.stock = { gt:0 };
     total = await prisma.fabricProduct.count({ where }).catch(()=>0);
-    products = await prisma.fabricProduct.findMany({ where, include:{ images:true, seller:true, category:true }, orderBy:{ createdAt:"desc" }, skip, take });
+    products = await prisma.fabricProduct.findMany({ where, include:{ images:true, seller:{ include:{ user:{ select:{ image:true, name:true } } } }, category:true }, orderBy:{ createdAt:"desc" }, skip, take });
     // Seller location filter + distance
     if (state || city || (lat!=null&&lng!=null)) {
       products = products.filter((p:any)=>{
@@ -63,8 +64,8 @@ export default async function FabricsPage({ searchParams }: { searchParams: Prom
         <div className="grid md:grid-cols-4 lg:grid-cols-6 gap-4 mt-6">
           {products.map((p:any)=>(
             <Link key={p.id} href={`/fabrics/${p.slug}`} className="group">
-              <div className="rounded-2xl overflow-hidden border bg-white"><div className="relative"><img src={p.images?.[0]?.url} alt={p.name} className="h-40 w-full object-cover group-hover:scale-105 transition" />{p._distance!=null && <span className="absolute top-2 right-2 bg-midnight text-white text-[11px] px-2 py-0.5 rounded-full">{p._distance.toFixed(1)}km</span>}</div>
-                <div className="p-3"><div className="text-sm font-medium line-clamp-1">{p.name}</div><div className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="h-3 w-3"/>{p.seller.businessName} • {p.seller.city||"—"} {p.seller.state&&`, ${p.seller.state}`}</div><div className="text-sm font-semibold mt-1">₦{Number(p.price).toLocaleString()} / {p.unit||"metre"}</div><div className="text-[11px] text-green-700">{p.stock>0? `${p.stock} in stock • ${p.material}` : "Out of stock"} {p.deliveryEligible && "• Delivery"}</div></div></div>
+              <div className="rounded-2xl overflow-hidden border bg-white dark:bg-[#292929] dark:border-[#3A3936]"><div className="relative"><img src={p.images?.[0]?.url} alt={p.name} className="h-40 w-full object-cover group-hover:scale-105 transition" />{p._distance!=null && <span className="absolute top-2 right-2 bg-midnight text-white text-[11px] px-2 py-0.5 rounded-full">{p._distance.toFixed(1)}km</span>}</div>
+                <div className="p-3"><div className="text-sm font-medium line-clamp-1 dark:text-[#F5F3EF]">{p.name}</div><div className="text-xs text-muted-foreground dark:text-[#B8B5AE] flex items-center gap-2 mt-1"><UserAvatar name={p.seller.businessName || p.seller.user?.name} image={p.seller.user?.image || p.seller.profileImage} size="xs" /><span className="line-clamp-1 flex items-center gap-1"><MapPin className="h-3 w-3"/>{p.seller.businessName} • {p.seller.city||"—"} {p.seller.state&&`, ${p.seller.state}`}</span></div><div className="text-sm font-semibold mt-1 dark:text-[#F5F3EF]">₦{Number(p.price).toLocaleString()} / {p.unit||"metre"}</div><div className="text-[11px] text-green-700 dark:text-[#49B77A]">{p.stock>0? `${p.stock} in stock • ${p.material}` : "Out of stock"} {p.deliveryEligible && "• Delivery"}</div></div></div>
             </Link>
           ))}
         </div>

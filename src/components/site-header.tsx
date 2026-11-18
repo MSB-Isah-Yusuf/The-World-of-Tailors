@@ -2,17 +2,33 @@
 import Link from "next/link";
 import { Button } from "./ui/button";
 import { Search, Heart, Menu, ChevronDown, Globe } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CartBadge } from "./cart/CartBadge";
 import { NotificationBell } from "./notifications/NotificationBell";
 import { useLanguage } from "@/lib/i18n";
 import { useThemeToggle } from "@/lib/theme";
+import { HeaderAvatar } from "./profile/HeaderAvatar";
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const { lang, setLang, t } = useLanguage();
   const { resolved, setTheme } = useThemeToggle();
+  const [authUser, setAuthUser] = useState<{ name?: string; image?: string | null; email?: string; role?: string } | null>(null);
+  useEffect(() => {
+    fetch("/api/profile/avatar", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setAuthUser(j?.user || null))
+      .catch(() => null);
+    const onAvatar = () => {
+      fetch("/api/profile/avatar", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => setAuthUser(j?.user || null))
+        .catch(() => null);
+    };
+    window.addEventListener("twt-avatar-updated", onAvatar as any);
+    return () => window.removeEventListener("twt-avatar-updated", onAvatar as any);
+  }, []);
   return (
     <header className="sticky top-0 z-50">
       <div className="bg-midnight text-ivory">
@@ -48,8 +64,14 @@ export function SiteHeader() {
               <Link href="/dashboard/customer/favorites" className="hidden sm:grid h-9 w-9 place-items-center rounded-full border bg-white dark:bg-white/[0.06] dark:border-white/10" aria-label="Favorites"><Heart className="h-4 w-4 text-midnight dark:text-ivory" /></Link>
               <CartBadge />
               <NotificationBell />
-              <Link href="/login" className="hidden sm:inline-flex"><Button variant="ghost" size="sm">{t("signIn")}</Button></Link>
-              <Link href="/register" className="hidden sm:inline-flex"><Button variant="primary" size="sm">{t("getStarted")}</Button></Link>
+              {authUser ? (
+                <HeaderAvatar size="md" />
+              ) : (
+                <>
+                  <Link href="/login" className="hidden sm:inline-flex"><Button variant="ghost" size="sm">{t("signIn")}</Button></Link>
+                  <Link href="/register" className="hidden sm:inline-flex"><Button variant="primary" size="sm">{t("getStarted")}</Button></Link>
+                </>
+              )}
               <button onClick={()=>setOpen(!open)} className="lg:hidden h-9 w-9 grid place-items-center rounded-full border bg-white dark:bg-white/[0.06] dark:text-ivory"><Menu className="h-4 w-4" /></button>
             </div>
           </div>

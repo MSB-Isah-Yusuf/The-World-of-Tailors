@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/rbac";
 import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { ProfileEditor } from "@/components/profile/ProfileEditor";
+import { LogoutButton } from "@/components/auth/LogoutButton";
 
 async function updatePassword(formData: FormData) {
   "use server";
@@ -43,9 +45,9 @@ export default async function AccountPage() {
   } catch {}
   return (
       <div className="space-y-6 max-w-3xl">
-        <div><h1 className="font-display text-2xl">Account Settings</h1><p className="text-sm text-muted-foreground">Profile • Password • Sessions • Preferences (theme EN|HA, dark/light via header)</p></div>
+        <div><h1 className="font-display text-2xl">Account Settings</h1><p className="text-sm text-muted-foreground">Profile picture • Name • Phone • Password • Sessions • Logout</p></div>
+        <ProfileEditor />
         <div className="grid md:grid-cols-2 gap-4">
-          <Card><CardHeader><CardTitle className="text-sm">Profile</CardTitle></CardHeader><CardContent className="text-sm space-y-1"><div>Name: {user?.name || (session!.user as any).name}</div><div className="text-xs text-muted-foreground">Email: {user?.email} • Role {user?.role} • {user?.status} • Joined {user ? new Date(user.createdAt).toLocaleDateString() : "—"}</div><div className="text-xs mt-2">Theme & HA persisted via UserPreference. Toggle via header sun/moon & EN|HA.</div></CardContent></Card>
           <Card><CardHeader><CardTitle className="text-sm">Change password</CardTitle></CardHeader><CardContent>
             <form action={updatePassword} className="space-y-2">
               <Input name="current" type="password" placeholder="Current password" className="h-8 bg-white" required/>
@@ -54,6 +56,7 @@ export default async function AccountPage() {
               <div className="text-xs text-muted-foreground">Bcrypt 10 • Audit logged • Sessions not revoked unless requested</div>
             </form>
           </CardContent></Card>
+          <Card><CardHeader><CardTitle className="text-sm">Logout</CardTitle></CardHeader><CardContent className="space-y-2 text-xs"><div>Secure logout — server session invalidated, client cache cleared.</div><LogoutButton variant="outline" size="sm" className="w-full h-8 text-xs border-burgundy/20 text-burgundy" label="Log out — invalidate session" redirectTo="/" /></CardContent></Card>
         </div>
         <Card><CardHeader><CardTitle className="text-sm">Active sessions ({sessions.length}) • Revoke suspicious</CardTitle></CardHeader>
           <CardContent className="space-y-2 text-xs">

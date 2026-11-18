@@ -4,6 +4,7 @@ import * as React from "react";
 import { useLanguage } from "@/lib/i18n";
 import { useThemeToggle } from "@/lib/theme";
 import { Sun, Moon, Globe } from "lucide-react";
+import { DashboardHeaderAvatar } from "@/components/profile/HeaderAvatar";
 import type { NavGroup } from "@/components/dashboard/PersistentShell";
 
 function isActive(pathname: string, href: string) {
@@ -38,7 +39,9 @@ export function DashboardHeader({ groups, onMenuOpen }: { groups: NavGroup[]; on
         <button onClick={()=> setLang(lang==="EN"?"HA":"EN")} className="h-9 px-3 rounded-full bg-midnight dark:bg-white/10 text-white dark:text-ivory text-xs font-medium flex items-center gap-1.5 border border-transparent dark:border-white/10 hover:opacity-90 transition">
           <Globe className="h-3.5 w-3.5" />{lang}
         </button>
-        <div className="hidden sm:flex h-9 w-9 rounded-full bg-plum text-white grid place-items-center text-xs font-bold">U</div>
+        <div className="hidden sm:flex">
+          <DashboardHeaderAvatar />
+        </div>
       </div>
     </header>
   );

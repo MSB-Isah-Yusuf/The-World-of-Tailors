@@ -5,6 +5,7 @@ import * as React from "react";
 import { useLanguage } from "@/lib/i18n";
 import { useThemeToggle } from "@/lib/theme";
 import { ChevronDown, LogOut } from "lucide-react";
+import { LogoutButton } from "@/components/auth/LogoutButton";
 import type { NavGroup } from "@/components/dashboard/PersistentShell";
 
 function isActive(pathname: string, href: string) {
@@ -102,6 +103,7 @@ export function MobileNav({ role, groups, open, setOpen }: { role: string; group
         <div className="p-4 border-t border-white/10 space-y-2 shrink-0">
           <div className="flex gap-2"><button onClick={()=> setTheme(resolved==="dark"?"light":"dark")} className="flex-1 px-3 py-2.5 rounded-xl bg-white/10 text-xs font-medium">{resolved==="dark"?t("light"):t("dark")}</button><button onClick={()=> setLang(lang==="EN"?"HA":"EN")} className="flex-1 px-3 py-2.5 rounded-xl bg-gold text-midnight text-xs font-bold">{lang==="EN"?"EN → HA":"HA → EN"}</button></div>
           <Link href="/" onClick={()=> setOpen(false)} className="flex items-center gap-2 text-xs text-ivory/70"><LogOut className="h-3 w-3" />{t("exitToStorefront")}</Link>
+          <LogoutButton variant="ghost" size="sm" className="w-full justify-start h-8 text-xs text-ivory/80 hover:bg-white/10 border border-white/10" label={t("logOut") || "Log out"} redirectTo="/" />
         </div>
       </div>
     </div>

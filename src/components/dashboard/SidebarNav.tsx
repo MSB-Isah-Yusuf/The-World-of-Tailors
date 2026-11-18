@@ -5,6 +5,7 @@ import * as React from "react";
 import { useLanguage } from "@/lib/i18n";
 import { useThemeToggle } from "@/lib/theme";
 import { LayoutDashboard, ChevronDown, Sparkles, Sun, Moon, LogOut } from "lucide-react";
+import { LogoutButton } from "@/components/auth/LogoutButton";
 import type { NavGroup } from "@/components/dashboard/PersistentShell";
 
 function isActive(pathname: string, href: string) {
@@ -101,6 +102,7 @@ export function SidebarNav({ role, groups }: { role: "CUSTOMER"|"TAILOR"|"SELLER
           <button onClick={()=> setLang(lang==="EN"?"HA":"EN")} className="flex-1 px-3 py-2.5 rounded-xl bg-gold text-midnight text-xs font-bold hover:bg-[#d2b06f] transition min-h-[36px]">{lang==="EN"?"EN | HA":"HA | EN"}</button>
         </div>
         <Link href="/" className="flex items-center gap-2 text-xs text-ivory/70 hover:text-ivory transition"><LogOut className="h-3 w-3" /> {t("exitToStorefront")}</Link>
+        <LogoutButton variant="ghost" size="sm" className="w-full justify-start h-8 text-xs text-ivory/80 hover:text-ivory hover:bg-white/10 border border-white/10 dark:border-white/10" label={t("logOut") || "Log out"} />
       </div>
     </aside>
   );

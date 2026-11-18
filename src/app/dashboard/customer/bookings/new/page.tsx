@@ -29,9 +29,11 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
         if (!isNaN(num)) snapshot[f.key] = num;
       }
     }
-    // Minimal required check: at least chest or waist or shirt_length
-    if (!snapshot.chest && !snapshot.shoulder && !snapshot.waist) {
-      // allow submit anyway — tailor will request full set, but warn
+    // Exactly 6 required per master spec: shoulder, sleeve_length, chest, shirt_length, trouser_length, ankle
+    const REQUIRED_6 = ["shoulder","sleeve_length","chest","shirt_length","trouser_length","ankle"] as const;
+    const missing = (REQUIRED_6 as readonly string[]).filter(k => snapshot[k]==null || snapshot[k]==="");
+    if (missing.length > 0) {
+      throw new Error(`Missing required: ${missing.join(", ")} — all 6 required fields must be filled`);
     }
 
     const tailor = await prisma.tailorProfile.findUnique({ where: { slug: tailorSlug } });
@@ -87,55 +89,38 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
   return (
     <div className="min-h-screen bg-[#FFFBF0] dark:bg-midnight"><SiteHeader />
       <div className="mx-auto max-w-3xl px-6 py-8">
-        <Card className="dark:bg-white/[0.05] dark:border-white/10">
-          <CardHeader><CardTitle className="dark:text-ivory">Request Tailoring — Full Measurements (Master List)</CardTitle><p className="text-sm text-muted-foreground dark:text-ivory/60">Tailor: {sp.tailor || "Select from portfolio"} • Design: {sp.design || "Bespoke"} • Complete list from master update — stored securely, only visible to chosen tailor. Priority: Shoulder → Neck → Arm → Chest/Bust → Shirt → Waist → Trouser</p></CardHeader>
+        <Card className="dark:bg-[#292929] dark:border-[#3A3936] bg-white">
+          <CardHeader><CardTitle className="dark:text-[#F5F3EF]">Request Tailoring — 6 Required Measurements</CardTitle><p className="text-sm text-muted-foreground dark:text-[#B8B5AE]">Tailor: {sp.tailor || "Select from portfolio"} • Design: {sp.design || "Bespoke"} • 6 required • rest optional • stored securely, only visible to chosen tailor</p></CardHeader>
           <CardContent>
             <form action={createBooking} className="space-y-6">
               <input type="hidden" name="tailorSlug" defaultValue={sp.tailor} />
               <input type="hidden" name="designSlug" defaultValue={sp.design} />
               
               <div className="space-y-3">
-                <div className="font-semibold text-sm flex justify-between dark:text-ivory">Upper body <span className="text-xs text-muted-foreground dark:text-ivory/60">{grouped.upper_body.length} fields</span></div>
+                <div className="font-semibold text-sm flex items-center gap-2 dark:text-[#F5F3EF]"><span className="h-1.5 w-1.5 rounded-full bg-[#C6A15B]" /> Required — 6 fields (inch) <span className="ml-auto text-xs text-muted-foreground dark:text-[#B8B5AE]">All 6 marked * are required</span></div>
                 <div className="grid md:grid-cols-3 gap-3">
-                  {grouped.upper_body.map(f=>(
-                    <div key={f.key}><Label>{f.labelEn} {f.required&&<span className="text-burgundy">*</span>}</Label><Input name={f.key} type="number" step="0.5" required={!!f.required} placeholder={f.placeholder} /><div className="text-[10px] text-muted-foreground">{f.labelHa} • {f.key}</div></div>
+                  {MEASUREMENT_FIELDS.filter(f=>f.required).map(f=>(
+                    <div key={f.key}><Label>{f.labelEn} <span className="text-burgundy">*</span> <span className="text-[10px] text-muted-foreground">inch</span></Label><Input name={f.key} type="number" step="0.5" required placeholder={f.placeholder} className="h-9" /><div className="text-[10px] text-muted-foreground">{f.labelHa}</div></div>
                   ))}
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <div className="font-semibold text-sm flex justify-between dark:text-ivory">Waist / Hip <span className="text-xs text-muted-foreground dark:text-ivory/60">{grouped.waist_torso.length} fields</span></div>
-                <div className="grid md:grid-cols-3 gap-3">
-                  {grouped.waist_torso.map(f=>(
-                    <div key={f.key}><Label>{f.labelEn} {f.required&&<span className="text-burgundy">*</span>}</Label><Input name={f.key} type="number" step="0.5" required={!!f.required} placeholder={f.placeholder} /></div>
+              <details className="space-y-3 rounded-xl border bg-ivory/50 dark:bg-[#242424] dark:border-[#3A3936] p-3">
+                <summary className="text-sm font-semibold cursor-pointer dark:text-[#F5F3EF]">Optional — expand for {MEASUREMENT_FIELDS.filter(f=>!f.required).length} more measurements</summary>
+                <div className="grid md:grid-cols-3 gap-3 pt-2">
+                  {MEASUREMENT_FIELDS.filter(f=>!f.required).map(f=>(
+                    <div key={f.key}><Label className="text-xs">{f.labelEn} <span className="text-[10px] text-muted-foreground">inch</span></Label><Input name={f.key} type="number" step="0.5" placeholder={f.placeholder} className="h-9" /></div>
                   ))}
                 </div>
-              </div>
-
-              <div className="space-y-3">
-                <div className="font-semibold text-sm flex justify-between dark:text-ivory">Lower body <span className="text-xs text-muted-foreground dark:text-ivory/60">{grouped.lower_body.length} fields</span></div>
-                <div className="grid md:grid-cols-3 gap-3">
-                  {grouped.lower_body.map(f=>(
-                    <div key={f.key}><Label>{f.labelEn} {f.required&&<span className="text-burgundy">*</span>}</Label><Input name={f.key} type="number" step="0.5" required={!!f.required} placeholder={f.placeholder} /></div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div className="font-semibold text-sm flex justify-between dark:text-ivory">Lengths / Other <span className="text-xs text-muted-foreground dark:text-ivory/60">{grouped.other.length} fields</span></div>
-                <div className="grid md:grid-cols-3 gap-3">
-                  {grouped.other.map(f=>(
-                    <div key={f.key}><Label>{f.labelEn} {f.required&&<span className="text-burgundy">*</span>}</Label><Input name={f.key} type="number" step="0.5" required={!!f.required} placeholder={f.placeholder} /></div>
-                  ))}
-                </div>
-              </div>
+                <div className="text-[11px] text-muted-foreground">Optional — leave blank if not needed. Tailor can request specifics.</div>
+              </details>
 
               <div className="grid md:grid-cols-2 gap-3">
                 <div><Label>Unit</Label><select name="unit" className="w-full h-10 rounded-xl border px-3 bg-white dark:bg-midnight/60"><option value="in">inches</option><option value="cm">cm</option></select></div>
                 <div><Label>Special instructions</Label><Input name="instructions" placeholder="Hidden pocket, agbada embroidery, etc." /></div>
               </div>
-              <div className="rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 p-3 text-xs">Full {MEASUREMENT_FIELDS.length} fields from master update — booking snapshot frozen. Tailor sees all values at /dashboard/tailor/production. Fabric sellers never see measurements (RBAC).</div>
-              <Button type="submit" className="w-full">Submit Full Booking — REQUESTED • {MEASUREMENT_FIELDS.length} fields</Button>
+              <div className="rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-500/20 p-3 text-xs dark:text-[#B8B5AE]">6 required (Shoulder, Sleeve/Arm Length, Chest, Shirt, Trouser, Ankle) • rest optional • snapshot frozen • Tailor sees at /dashboard/tailor/production • sellers never see measurements (RBAC)</div>
+              <Button type="submit" className="w-full">Submit Booking — REQUESTED • 6 required</Button>
             </form>
           </CardContent>
         </Card>

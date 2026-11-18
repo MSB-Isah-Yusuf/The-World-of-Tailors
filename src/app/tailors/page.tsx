@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { prisma } from "@/lib/prisma";
+import { UserAvatar } from "@/components/ui/avatar";
 import { MapPin, Star, ShieldCheck } from "lucide-react";
 import { distanceKm, NIGERIA_STATES } from "@/lib/location-data";
 
@@ -66,8 +67,8 @@ export default async function TailorsPage({ searchParams }: { searchParams: Prom
   } catch {}
   if (tailors.length===0 && !q && !state) {
     tailors = [
-      { id:"1", businessName:"Ade Bespoke", slug:"ade-bespoke", city:"Lagos", state:"Lagos", specialties:'["Agbada","Kaftan"]', profileImage:"https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400&auto=format&fit=crop", ratingAvg:4.9, ratingCount:124, startingPrice:45000 },
-      { id:"2", businessName:"Zara Stitches", slug:"zara-stitches", city:"Abuja", state:"FCT", specialties:'["Bridal","Ankara"]', profileImage:"https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400&auto=format&fit=crop", ratingAvg:4.8, ratingCount:98, startingPrice:35000 },
+      { id:"1", businessName:"Ade Bespoke", slug:"ade-bespoke", city:"Lagos", state:"Lagos", specialties:'["Agbada","Kaftan"]', profileImage:"https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400&auto=format&fit=crop", user:{ image:null, name:"Ade Bespoke" }, ratingAvg:4.9, ratingCount:124, startingPrice:45000 },
+      { id:"2", businessName:"Zara Stitches", slug:"zara-stitches", city:"Abuja", state:"FCT", specialties:'["Bridal","Ankara"]', profileImage:"https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400&auto=format&fit=crop", user:{ image:null, name:"Zara Stitches" }, ratingAvg:4.8, ratingCount:98, startingPrice:35000 },
     ];
   }
 
@@ -97,13 +98,13 @@ export default async function TailorsPage({ searchParams }: { searchParams: Prom
         <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-6 mt-6">
           {tailors.map((t:any)=>(
             <Link key={t.id} href={`/tailors/${t.slug}`}>
-              <Card className="overflow-hidden hover:shadow-lg transition border-midnight/10">
-                <div className="relative"><img src={t.profileImage || `https://picsum.photos/seed/${t.slug}/400/300`} alt={t.businessName} className="h-48 w-full object-cover" /><div className="absolute top-2 left-2 bg-emeraldDeep text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1"><ShieldCheck className="h-3 w-3"/> Verified</div>{(t._distance!=null) && <div className="absolute top-2 right-2 bg-midnight text-white text-[11px] px-2 py-0.5 rounded-full">{t._distance.toFixed(1)}km away</div>}</div>
+              <Card className="overflow-hidden hover:shadow-lg transition border-midnight/10 dark:bg-[#292929] dark:border-[#3A3936]">
+                <div className="relative"><img src={t.profileImage || t.user?.image || `https://picsum.photos/seed/${t.slug}/400/300`} alt={t.businessName} className="h-48 w-full object-cover" /><div className="absolute top-2 left-2 bg-emeraldDeep text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1"><ShieldCheck className="h-3 w-3"/> Verified</div><div className="absolute bottom-2 left-2 rounded-full border-2 border-white dark:border-[#3A3936] shadow overflow-hidden"><UserAvatar name={t.businessName || t.user?.name} image={t.user?.image || t.profileImage} size="sm" /></div>{(t._distance!=null) && <div className="absolute top-2 right-2 bg-midnight text-white text-[11px] px-2 py-0.5 rounded-full">{t._distance.toFixed(1)}km away</div>}</div>
                 <CardContent className="p-4">
-                  <div className="font-semibold">{t.businessName}</div>
-                  <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1"><MapPin className="h-3 w-3"/>{t.city}, {t.state} • {(() => { try{ return JSON.parse(t.specialties||"[]")[0]} catch{ return (t.specialties||"Bespoke").split(",")[0] } })()}</div>
-                  <div className="flex items-center gap-1 mt-2 text-xs"><Star className="h-3 w-3 fill-amber-500 text-amber-500"/>{t.ratingAvg?.toFixed(1)} ({t.ratingCount} reviews) <span className="ml-auto font-semibold text-emeraldDeep">From ₦{Number(t.startingPrice||25000).toLocaleString()}</span></div>
-                  <div className="mt-3 flex gap-2"><span className="flex-1 text-center text-xs px-2 py-1 rounded-full bg-midnight text-white">View Profile</span><span className="flex-1 text-center text-xs px-2 py-1 rounded-full border">Book</span></div>
+                  <div className="font-semibold dark:text-[#F5F3EF] flex items-center gap-2"><UserAvatar name={t.businessName || t.user?.name} image={t.user?.image || t.profileImage} size="xs" className="md:hidden" /> {t.businessName}</div>
+                  <div className="text-xs text-muted-foreground dark:text-[#B8B5AE] flex items-center gap-1 mt-1"><MapPin className="h-3 w-3"/>{t.city}, {t.state} • {(() => { try{ return JSON.parse(t.specialties||"[]")[0]} catch{ return (t.specialties||"Bespoke").split(",")[0] } })()}</div>
+                  <div className="flex items-center gap-1 mt-2 text-xs dark:text-[#B8B5AE]"><Star className="h-3 w-3 fill-amber-500 text-amber-500"/>{t.ratingAvg?.toFixed(1)} ({t.ratingCount} reviews) <span className="ml-auto font-semibold text-emeraldDeep dark:text-[#49B77A]">From ₦{Number(t.startingPrice||25000).toLocaleString()}</span></div>
+                  <div className="mt-3 flex gap-2"><span className="flex-1 text-center text-xs px-2 py-1 rounded-full bg-midnight text-white dark:bg-[#C6A15B] dark:text-[#191919]">View Profile</span><span className="flex-1 text-center text-xs px-2 py-1 rounded-full border dark:border-[#3A3936] dark:text-[#B8B5AE]">Book</span></div>
                 </CardContent>
               </Card>
             </Link>

@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { distanceKm } from "@/lib/location-data";
 import { HomepageLocationSelector } from "@/components/location/HomepageLocationSelector";
+import { UserAvatar } from "@/components/ui/avatar";
 import { ArrowRight, Scissors, ShieldCheck, MapPin, Star, Quote, Mail, Sparkles, Clock3, Package } from "lucide-react";
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<{ state?: string; city?: string; lat?: string; lng?: string }> }) {
@@ -39,9 +40,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   try {
     // Base featured (fallback)
     [featuredTailors, featuredDesigns, featuredFabrics] = await Promise.all([
-      prisma.tailorProfile.findMany({ where: { isPublished: true, businessStatus:"APPROVED" }, take: 8, include: { user: true }, orderBy:{ ratingAvg:"desc" } }),
-      prisma.design.findMany({ where: { isPublished: true }, take: 6, include: { tailor: true, images: true } }),
-      prisma.fabricProduct.findMany({ where: { isPublished: true }, take: 6, include: { seller: true, images: true } }),
+      prisma.tailorProfile.findMany({ where: { isPublished: true, businessStatus:"APPROVED" }, take: 8, include: { user: { select: { image: true, name: true } } }, orderBy:{ ratingAvg:"desc" } }),
+      prisma.design.findMany({ where: { isPublished: true }, take: 6, include: { tailor: { include: { user: { select: { image: true, name: true } } } }, images: true } }),
+      prisma.fabricProduct.findMany({ where: { isPublished: true }, take: 6, include: { seller: { include: { user: { select: { image: true, name: true } } } }, images: true } }),
     ]);
 
     // Location-aware ranking for tailors
@@ -212,9 +213,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-4 mt-6">
           {nearbyTailors.map((t:any)=>(
             <Link key={t.id} href={`/tailors/${t.slug}`} className="group">
-              <div className="rounded-2xl overflow-hidden border bg-white hover:shadow-card transition">
-                <div className="relative"><img src={t.profileImage || `https://picsum.photos/seed/${t.slug}/400/300`} alt={t.businessName} className="h-44 w-full object-cover group-hover:scale-[1.04] transition" /><div className="absolute top-2 left-2 bg-emeraldDeep text-white text-[11px] px-2 py-0.5 rounded-full flex items-center gap-1"><ShieldCheck className="h-3 w-3"/>Verified</div>{t._distance!=null && <div className="absolute top-2 right-2 bg-midnight text-white text-[11px] px-2 py-0.5 rounded-full">{t._distance.toFixed(1)}km away</div>}</div>
-                <div className="p-3"><div className="text-sm font-medium line-clamp-1">{t.businessName}</div><div className="text-xs text-taupe flex items-center gap-1"><MapPin className="h-3 w-3"/>{t.city}, {t.state} • {JSON.parse(t.specialties||'["Bespoke"]')[0]}</div><div className="flex items-center gap-1 mt-2"><Star className="h-3.5 w-3.5 text-gold fill-gold"/><span className="text-xs font-medium">{t.ratingAvg.toFixed(1)} ({t.ratingCount})</span><span className="ml-auto text-xs text-emeraldDeep">From ₦{Number(t.startingPrice||25000).toLocaleString()}</span></div><div className="mt-2 flex gap-2"><span className="flex-1 text-center text-xs px-2 py-1 rounded-full bg-midnight text-white">View Profile</span><span className="flex-1 text-center text-xs px-2 py-1 rounded-full border">Book Tailor</span></div></div>
+              <div className="rounded-2xl overflow-hidden border bg-white dark:bg-[#292929] dark:border-[#3A3936] hover:shadow-card transition">
+                <div className="relative"><img src={t.profileImage || t.user?.image || `https://picsum.photos/seed/${t.slug}/400/300`} alt={t.businessName} className="h-44 w-full object-cover group-hover:scale-[1.04] transition" /><div className="absolute top-2 left-2 bg-emeraldDeep text-white text-[11px] px-2 py-0.5 rounded-full flex items-center gap-1"><ShieldCheck className="h-3 w-3"/>Verified</div><div className="absolute bottom-2 left-2 rounded-full border-2 border-white dark:border-[#3A3936] overflow-hidden shadow"><UserAvatar name={t.businessName || t.user?.name} image={t.user?.image || t.profileImage} size="sm" /></div>{t._distance!=null && <div className="absolute top-2 right-2 bg-midnight text-white text-[11px] px-2 py-0.5 rounded-full">{t._distance.toFixed(1)}km away</div>}</div>
+                <div className="p-3"><div className="text-sm font-medium line-clamp-1 dark:text-[#F5F3EF] flex items-center gap-2"><UserAvatar name={t.businessName || t.user?.name} image={t.user?.image || t.profileImage} size="xs" className="md:hidden" /> {t.businessName}</div><div className="text-xs text-taupe dark:text-[#B8B5AE] flex items-center gap-1"><MapPin className="h-3 w-3"/>{t.city}, {t.state} • {JSON.parse(t.specialties||'["Bespoke"]')[0]}</div><div className="flex items-center gap-1 mt-2"><Star className="h-3.5 w-3.5 text-gold fill-gold"/><span className="text-xs font-medium dark:text-[#F5F3EF]">{t.ratingAvg.toFixed(1)} ({t.ratingCount})</span><span className="ml-auto text-xs text-emeraldDeep dark:text-[#49B77A]">From ₦{Number(t.startingPrice||25000).toLocaleString()}</span></div><div className="mt-2 flex gap-2"><span className="flex-1 text-center text-xs px-2 py-1 rounded-full bg-midnight text-white dark:bg-[#C6A15B] dark:text-[#191919]">View Profile</span><span className="flex-1 text-center text-xs px-2 py-1 rounded-full border dark:border-[#3A3936] dark:text-[#B8B5AE]">Book Tailor</span></div></div>
               </div>
             </Link>
           ))}
@@ -232,9 +233,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-4 mt-6">
             {nearbySellers.map((s:any)=>(
               <Link key={s.id} href={`/sellers/${s.slug}`} className="group">
-                <div className="rounded-2xl overflow-hidden border border-white/10 bg-white text-charcoal">
-                  <img src={s.profileImage || `https://picsum.photos/seed/${s.slug}/400/300`} alt={s.businessName} className="h-40 w-full object-cover group-hover:scale-[1.04] transition" />
-                  <div className="p-3"><div className="text-sm font-medium line-clamp-1">{s.businessName}</div><div className="text-xs text-taupe flex items-center gap-1"><MapPin className="h-3 w-3"/>{s.city}, {s.state} {s._distance!=null && `• ${s._distance.toFixed(1)}km`}</div><div className="text-xs mt-1">{s.deliveryMethods||"Dispatch • Pickup"} • {s._distance!=null ? `${s._distance.toFixed(0)}km` : "Regional"}</div><div className="mt-2 flex gap-2"><span className="flex-1 text-center text-xs px-2 py-1 rounded-full bg-midnight text-white">View Shop</span><span className="flex-1 text-center text-xs px-2 py-1 rounded-full border">View Fabric</span></div></div>
+                <div className="rounded-2xl overflow-hidden border border-white/10 bg-white text-charcoal dark:bg-[#292929] dark:border-[#3A3936] dark:text-[#F5F3EF]">
+                  <div className="relative"><img src={s.profileImage || s.user?.image || `https://picsum.photos/seed/${s.slug}/400/300`} alt={s.businessName} className="h-40 w-full object-cover group-hover:scale-[1.04] transition" /><div className="absolute bottom-2 left-2 rounded-full border-2 border-white dark:border-[#3A3936] overflow-hidden shadow"><UserAvatar name={s.businessName || s.user?.name} image={s.user?.image || s.profileImage} size="sm" /></div></div>
+                  <div className="p-3"><div className="text-sm font-medium line-clamp-1 flex items-center gap-2"><UserAvatar name={s.businessName || s.user?.name} image={s.user?.image || s.profileImage} size="xs" className="md:hidden" /> {s.businessName}</div><div className="text-xs text-taupe dark:text-[#B8B5AE] flex items-center gap-1"><MapPin className="h-3 w-3"/>{s.city}, {s.state} {s._distance!=null && `• ${s._distance.toFixed(1)}km`}</div><div className="text-xs mt-1 dark:text-[#B8B5AE]">{s.deliveryMethods||"Dispatch • Pickup"} • {s._distance!=null ? `${s._distance.toFixed(0)}km` : "Regional"}</div><div className="mt-2 flex gap-2"><span className="flex-1 text-center text-xs px-2 py-1 rounded-full bg-midnight text-white dark:bg-[#C6A15B] dark:text-[#191919]">View Shop</span><span className="flex-1 text-center text-xs px-2 py-1 rounded-full border dark:border-[#3A3936] dark:text-[#B8B5AE]">View Fabric</span></div></div>
                 </div>
               </Link>
             ))}
@@ -253,15 +254,15 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </div>
         <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-4 mt-6">
           {(featuredDesigns.length ? featuredDesigns : Array.from({ length: 6 }).map((_, i) => ({
-            id: `${i}`, slug: `design-${i}`, title: ["Heritage Agbada","Ankara Midi","Corporate Kaftan","Wedding Aso-Oke","Casual Senator","Kids Ankara"][i], price: 25000 + i*5000, images: [{ url: `https://images.unsplash.com/photo-${["1558769132-cb1aea458c5e","1529626455594-4ff0802cfb7e","1515886657613-9f3515b0c78f","1490481651871-ab68de25d43d","1441986300917-64674bd600d8","1485230893385-4a4c9ff37d2c"][i]}?q=80&w=400&auto=format&fit=crop` }], tailor: { businessName: "Ade Bespoke" }
+            id: `${i}`, slug: `design-${i}`, title: ["Heritage Agbada","Ankara Midi","Corporate Kaftan","Wedding Aso-Oke","Casual Senator","Kids Ankara"][i], price: 25000 + i*5000, images: [{ url: `https://images.unsplash.com/photo-${["1558769132-cb1aea458c5e","1529626455594-4ff0802cfb7e","1515886657613-9f3515b0c78f","1490481651871-ab68de25d43d","1441986300917-64674bd600d8","1485230893385-4a4c9ff37d2c"][i]}?q=80&w=400&auto=format&fit=crop` }], tailor: { businessName: "Ade Bespoke", user:{ image:null, name:"Ade Bespoke" } }
           }))).map((d: any) => (
             <Link key={d.id} href={`/designs/${d.slug}`} className="group">
-              <div className="rounded-2xl overflow-hidden border bg-white hover:shadow-card transition">
+              <div className="rounded-2xl overflow-hidden border bg-white dark:bg-[#292929] dark:border-[#3A3936] hover:shadow-card transition">
                 <div className="relative">
                   <img src={d.images?.[0]?.url || `https://picsum.photos/seed/${d.slug}/400/500`} alt={d.title} className="h-56 w-full object-cover group-hover:scale-[1.04] transition duration-500" />
-                  <div className="absolute top-2 left-2 bg-white/90 border rounded-full px-2 py-0.5 text-[11px] font-medium">From ₦{Number(d.price).toLocaleString()}</div>
+                  <div className="absolute top-2 left-2 bg-white/90 dark:bg-[#191919]/90 dark:text-[#F5F3EF] border dark:border-[#3A3936] rounded-full px-2 py-0.5 text-[11px] font-medium">From ₦{Number(d.price).toLocaleString()}</div>
                 </div>
-                <div className="p-3"><div className="text-sm font-medium line-clamp-1">{d.title}</div><div className="text-xs text-taupe">{d.tailor?.businessName || "TWT Atelier"} • View Design</div></div>
+                <div className="p-3"><div className="text-sm font-medium line-clamp-1 dark:text-[#F5F3EF]">{d.title}</div><div className="text-xs text-taupe dark:text-[#B8B5AE] flex items-center gap-2 mt-1"><UserAvatar name={d.tailor?.businessName || d.tailor?.user?.name} image={d.tailor?.user?.image || d.tailor?.profileImage} size="xs" /> {d.tailor?.businessName || "TWT Atelier"} • View Design</div></div>
               </div>
             </Link>
           ))}

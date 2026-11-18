@@ -38,19 +38,19 @@
     --card-foreground: 40 14% 95%;
     --popover: 0 0% 19%; /* #303030 elevated */
     --popover-foreground: 40 14% 95%;
-    --primary: 19 88% 54%; /* #F16A24 orange accent */
-    --primary-foreground: 0 0% 98%;
+    --primary: 38 44% 57%; /* #C6A15B gold brand accent */
+    --primary-foreground: 0 0% 10%;
     --secondary: 0 0% 13%; /* #222222 secondary surface / sidebar */
     --secondary-foreground: 40 14% 95%;
     --muted: 0 0% 14%; /* #242424 outer background */
     --muted-foreground: 40 7% 70%; /* #B8B5AE secondary text */
-    --accent: 43 77% 61%; /* #E8B94E gold highlight */
+    --accent: 38 44% 57%; /* #C6A15B gold highlight — unified */
     --accent-foreground: 0 0% 10%;
     --destructive: 4 66% 64%; /* #E36C63 */
     --destructive-foreground: 0 0% 98%;
     --border: 30 4% 22%; /* #3A3936 */
     --input: 0 0% 13%; /* #202020 */
-    --ring: 25 86% 66%; /* #F3A15E focus */
+    --ring: 38 44% 57%; /* #C6A15B gold focus */
     --success: 148 43% 50%;
     --warning: 38 92% 50%;
     --info: 223 44% 11%;
@@ -83,7 +83,7 @@
   border: 1px solid rgba(81,37,79,0.12);
 }
 
-/* Premium gradients — light keeps navy/plum, dark shifts to charcoal/orange depth */
+/* Premium gradients — light keeps navy/plum, dark shifts to charcoal/gold depth */
 .gradient-navy-plum { background: linear-gradient(135deg,#10182B 0%, #51254F 100%); }
 .gradient-emerald-navy { background: linear-gradient(135deg,#145447 0%, #10182B 100%); }
 .gradient-burgundy-plum { background: linear-gradient(135deg,#722F45 0%, #51254F 100%); }
@@ -99,9 +99,9 @@
 .shadow-soft { box-shadow: 0 2px 12px rgba(16,24,43,0.07); }
 .dark .shadow-soft { box-shadow: 0 2px 12px rgba(0,0,0,0.35) !important; }
 
-/* Focus — #F3A15E orange focus */
+/* Focus — #C6A15B gold focus */
 *:focus-visible { outline: 2px solid #C6A15B; outline-offset: 2px; }
-.dark *:focus-visible { outline-color: #F3A15E !important; }
+.dark *:focus-visible { outline-color: #C6A15B !important; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
@@ -134,7 +134,7 @@
 /* Header glass in dark — charcoal glass */
 .dark .glass { background: rgba(25,25,25,0.92) !important; border-color: rgba(58,57,54,0.9) !important; box-shadow: 0 8px 24px rgba(0,0,0,0.5) !important; }
 .dark .glass .text-midnight { color: #F5F3EF !important; }
-.dark .glass .hover\:text-plum:hover { color: #F16A24 !important; }
+.dark .glass .hover\:text-plum:hover { color: #C6A15B !important; }
 
 /* Alternating rows that were bg-ivory inside cards — slightly lighter than card */
 .dark .bg-ivory.border,
@@ -176,7 +176,7 @@
 .dark p { color: #F5F3EF; }
 .dark .text-plum { color: #E8B94E !important; }
 .dark .text-burgundy { color: #E36C63 !important; }
-.dark .text-plum\/80, .dark .hover\:text-plum:hover { color: #F16A24 !important; }
+.dark .text-plum\/80, .dark .hover\:text-plum:hover { color: #C6A15B !important; }
 
 /* Borders */
 .dark .border-midnight\/10, .dark .border-midnight\/15, .dark .border-midnight\/20 { border-color: #3A3936 !important; }
@@ -187,16 +187,16 @@
 /* Header specifics — keep dark top bar as outer background #242424 */
 .dark header.bg-white { background-color: #222222 !important; border-color: #3A3936 !important; }
 .dark .bg-midnight { background-color: #242424 !important; border-color: #3A3936 !important; color: #F5F3EF !important; }
-/* But selected pills must STAND OUT — orange primary */
+/* But selected pills must STAND OUT — gold primary #C6A15B */
 .dark .rounded-full.bg-midnight,
 .dark a.rounded-full.bg-midnight,
 .dark .rounded-full.bg-midnight.text-white,
 .dark button.rounded-full.bg-midnight,
 .dark a[class*="rounded-full"][class*="bg-midnight"] {
-  background-color: #F16A24 !important;
-  color: #FFFFFF !important;
-  border-color: #F16A24 !important;
-  box-shadow: 0 0 14px rgba(241,106,36,0.35), 0 2px 8px rgba(0,0,0,0.35) !important;
+  background-color: #C6A15B !important;
+  color: #191919 !important;
+  border-color: #C6A15B !important;
+  box-shadow: 0 0 14px rgba(198,161,91,0.35), 0 2px 8px rgba(0,0,0,0.35) !important;
   font-weight: 600;
 }
 .dark .bg-midnight.text-white { color: #FFFFFF !important; }
@@ -208,7 +208,7 @@
   box-shadow: 0 0 10px rgba(73,183,122,0.25) !important;
 }
 .dark .bg-plum { background-color: #51254F !important; border-color: rgba(81,37,79,0.5) !important; }
-.dark .bg-gold { background-color: #E8B94E !important; color: #191919 !important; border-color: rgba(232,185,78,0.5) !important; }
+.dark .bg-gold { background-color: #C6A15B !important; color: #191919 !important; border-color: rgba(198,161,91,0.5) !important; }
 
 /* Selected filter pills — amber draft */
 .dark .rounded-full.bg-amber-100,
@@ -247,8 +247,8 @@
 .dark input:focus,
 .dark textarea:focus,
 .dark select:focus {
-  border-color: #F3A15E !important;
-  box-shadow: 0 0 0 2px rgba(243,161,94,0.20) !important;
+  border-color: #C6A15B !important;
+  box-shadow: 0 0 0 2px rgba(198,161,91,0.20) !important;
   outline: none !important;
 }
 .dark select option {
