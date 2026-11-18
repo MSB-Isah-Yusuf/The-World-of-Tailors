@@ -20,6 +20,10 @@ async function togglePublish(formData: FormData) {
   if (!profile) return;
   const design = await prisma.design.findUnique({ where: { id: designId } });
   if (!design || design.tailorId !== profile.id) throw new Error("FORBIDDEN");
+  // Publish guard — only APPROVED tailors can publish (matches createDesign logic)
+  if (!design.isPublished && profile.businessStatus !== "APPROVED") {
+    redirect("/dashboard/tailor/designs?error=NotApproved");
+  }
   const updated = await prisma.design.update({ where: { id: designId }, data: { isPublished: !design.isPublished } });
   await prisma.auditLog.create({ data: { userId, action: updated.isPublished ? "PUBLISH_DESIGN" : "UNPUBLISH_DESIGN", entity: "Design", entityId: designId, metadata: { title: design.title } } });
   revalidatePath("/dashboard/tailor/designs");
@@ -229,9 +233,9 @@ export default async function TailorDesignsPage({ searchParams }: { searchParams
                 <CardContent className="space-y-2">
                   <div className="flex gap-1 overflow-x-auto pb-1">{d.images.slice(0,4).map((im:any)=><img key={im.id} src={im.url} alt={im.alt||""} className={`h-8 w-8 rounded-lg object-cover border-2 ${im.isCover?"border-gold":"border-transparent"}`} />)} {d.images.length>4 && <span className="text-xs self-center text-muted-foreground">+{d.images.length-4}</span>}</div>
                   <div className="flex gap-2">
-                    <form action={togglePublish} className="flex-1"><input type="hidden" name="designId" value={d.id} /><Button size="sm" variant={d.isPublished?"outline":"default"} className="w-full h-7 text-xs">{d.isPublished?"Unpublish":"Publish"}</Button></form>
+                    <form action={togglePublish} className="flex-1"><input type="hidden" name="designId" value={d.id} /><Button type="submit" size="sm" variant={d.isPublished?"outline":"default"} className="w-full h-7 text-xs">{d.isPublished?"Unpublish":"Publish now"}</Button></form>
                     <Link href={`/designs/${d.slug}`} className="flex-1"><Button size="sm" variant="outline" className="w-full h-7 text-xs">View</Button></Link>
-                    <form action={deleteDesign} onSubmit={e=>{ if(!confirm(`Delete "${d.title}"? This archives if bookings exist and affects public /tailors/${profile.slug}. Continue?`)) e.preventDefault(); }}><input type="hidden" name="designId" value={d.id} /><Button size="sm" variant="outline" className="h-7 text-xs text-burgundy border-burgundy/20">Delete</Button></form>
+                    <form action={deleteDesign} onSubmit={e=>{ if(!confirm(`Delete "${d.title}"? This archives if bookings exist and affects public /tailors/${profile.slug}. Continue?`)) e.preventDefault(); }}><input type="hidden" name="designId" value={d.id} /><Button type="submit" size="sm" variant="outline" className="h-7 text-xs text-burgundy border-burgundy/20">Delete</Button></form>
                   </div>
                   {d.tags && <div className="text-[11px] text-muted-foreground truncate">Tags: {d.tags}</div>}
                 </CardContent>
@@ -242,7 +246,7 @@ export default async function TailorDesignsPage({ searchParams }: { searchParams
           <Card><CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full text-sm"><thead className="text-xs text-muted-foreground border-b"><tr><th className="text-left py-2 px-3">Design</th><th className="text-left py-2">Category</th><th className="text-left py-2">Price</th><th className="text-left py-2">Status</th><th className="text-right py-2 px-3">Actions</th></tr></thead>
-              <tbody>{designs.map((d:any)=><tr key={d.id} className="border-b hover:bg-ivory/60"><td className="py-3 px-3"><div className="flex gap-3 items-center"><img src={d.images[0]?.url} alt={d.title} className="h-10 w-10 rounded-lg object-cover border" /><div><div className="font-medium">{d.title}</div><div className="text-xs text-muted-foreground">{d.slug}</div></div></div></td><td className="py-3 text-xs">{d.category?.name||"—"}</td><td className="py-3 text-xs">{d.price?`₦${Number(d.price).toLocaleString()}`:"—"}</td><td className="py-3"><Badge variant={d.isPublished?"success":"secondary"}>{d.isPublished?"PUBLISHED":"DRAFT"}</Badge></td><td className="py-3 text-right"><div className="flex justify-end gap-2"><form action={togglePublish}><input type="hidden" name="designId" value={d.id} /><Button size="sm" variant="outline" className="h-7 text-xs">{d.isPublished?"Unpublish":"Publish"}</Button></form><form action={deleteDesign}><input type="hidden" name="designId" value={d.id} /><Button size="sm" variant="outline" className="h-7 text-xs text-burgundy">Delete</Button></form></div></td></tr>)}</tbody></table>
+              <tbody>{designs.map((d:any)=><tr key={d.id} className="border-b hover:bg-ivory/60"><td className="py-3 px-3"><div className="flex gap-3 items-center"><img src={d.images[0]?.url} alt={d.title} className="h-10 w-10 rounded-lg object-cover border" /><div><div className="font-medium">{d.title}</div><div className="text-xs text-muted-foreground">{d.slug}</div></div></div></td><td className="py-3 text-xs">{d.category?.name||"—"}</td><td className="py-3 text-xs">{d.price?`₦${Number(d.price).toLocaleString()}`:"—"}</td><td className="py-3"><Badge variant={d.isPublished?"success":"secondary"}>{d.isPublished?"PUBLISHED":"DRAFT"}</Badge></td><td className="py-3 text-right"><div className="flex justify-end gap-2"><form action={togglePublish}><input type="hidden" name="designId" value={d.id} /><Button type="submit" size="sm" variant="outline" className="h-7 text-xs">{d.isPublished?"Unpublish":"Publish now"}</Button></form><form action={deleteDesign}><input type="hidden" name="designId" value={d.id} /><Button type="submit" size="sm" variant="outline" className="h-7 text-xs text-burgundy">Delete</Button></form></div></td></tr>)}</tbody></table>
             </div>
           </CardContent></Card>
         )}
