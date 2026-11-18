@@ -1,10 +1,11 @@
 "use client";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { DeleteMeasurementButton } from "./DeleteMeasurementButton";
 
 export function MeasurementDetailActions({ id }: { id: string }) {
   return (
-    <div className="mt-2 flex gap-2">
+    <div className="mt-2 flex flex-wrap gap-2 items-center">
       <Link href={`/dashboard/tailor/measurements/${id}?edit=1`}>
         <Button size="sm" variant="outline" className="h-7 text-xs">Edit</Button>
       </Link>
@@ -25,6 +26,7 @@ export function MeasurementDetailActions({ id }: { id: string }) {
       <a href={`/api/tailor/measurements/${id}/export`} className="text-xs underline self-center">
         Export JSON
       </a>
+      <span className="ml-auto"><DeleteMeasurementButton id={id} variant="detail" /></span>
     </div>
   );
 }

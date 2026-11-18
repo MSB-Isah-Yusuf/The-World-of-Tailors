@@ -4,8 +4,9 @@ import { Input } from "@/components/ui/input";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/rbac";
 import Link from "next/link";
+import { DeleteMeasurementButton } from "@/components/mannequin/DeleteMeasurementButton";
 
-export default async function MeasurementsDashboard({ searchParams }: { searchParams: Promise<{ q?:string; type?:string; garment?:string; gender?:string }> }) {
+export default async function MeasurementsDashboard({ searchParams }: { searchParams: Promise<{ q?:string; type?:string; garment?:string; gender?:string; deleted?:string }> }) {
   const sp = await searchParams;
   const session = await requireRole(["TAILOR"]);
   const profile = await prisma.tailorProfile.findUnique({ where:{ userId: (session.user as any).id } });
@@ -39,6 +40,7 @@ export default async function MeasurementsDashboard({ searchParams }: { searchPa
 
   return (
       <div className="space-y-6">
+        {sp?.deleted && <div className="rounded-xl border border-emerald-200 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-500/20 px-4 py-3 text-sm text-emerald-900 dark:text-[#B8B5AE]">✓ Measurement record {sp.deleted==="archived" ? "archived — active booking snapshot preserved" : "deleted"} • Audit logged</div>}
         <div className="flex flex-wrap justify-between gap-4">
           <div>
             <h1 className="font-display text-2xl">Customer Measurements</h1>
@@ -83,6 +85,7 @@ export default async function MeasurementsDashboard({ searchParams }: { searchPa
                 <CardContent className="space-y-2 text-xs">
                   <div className="flex gap-2"><span className="px-2 py-1 rounded-full bg-champagne text-midnight text-xs">{p.status}</span><span className="text-muted-foreground">{p.values.length} values • {p.bookingId?`Booking ${p.bookingId.slice(0,6)}`:"No booking link"}</span></div>
                   <div className="flex gap-2"><Link href={`/dashboard/tailor/measurements/${p.id}`} className="flex-1"><Button size="sm" className="w-full h-7 text-xs">View Measurements</Button></Link><Link href={`/dashboard/tailor/measurements/${p.id}?edit=1`} className="flex-1"><Button size="sm" variant="outline" className="w-full h-7 text-xs">Edit</Button></Link></div>
+                  <div className="flex gap-2 mt-1"><DeleteMeasurementButton id={p.id} displayName={displayName} garmentType={p.garmentType} /></div>
                 </CardContent>
               </Card>
             );

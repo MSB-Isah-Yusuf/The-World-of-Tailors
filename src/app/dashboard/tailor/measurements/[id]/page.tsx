@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/rbac";
 import { MeasurementSimpleForm } from "@/components/mannequin/MeasurementSimpleForm";
 import { MeasurementDetailActions } from "@/components/mannequin/MeasurementDetailActions";
+import { DeleteMeasurementButton } from "@/components/mannequin/DeleteMeasurementButton";
 import Link from "next/link";
 
 export default async function MeasurementDetailPage({ params, searchParams }: { params: Promise<{ id:string }>; searchParams: Promise<{ edit?:string }> }) {
@@ -28,7 +29,7 @@ export default async function MeasurementDetailPage({ params, searchParams }: { 
       <div className="space-y-6">
         <div className="flex flex-wrap justify-between gap-3">
           <div><h1 className="font-display text-2xl">{displayName} • {mp.garmentType}</h1><p className="text-sm text-muted-foreground">{mp.bodyTemplate} • {mp.unit} • Status {mp.status} • Updated {new Date(mp.updatedAt).toLocaleString()}</p></div>
-          <div className="flex gap-2 text-xs"><Link href="/dashboard/tailor/measurements"><Button variant="outline" size="sm">← Back</Button></Link><span className="px-3 py-1 rounded-full bg-champagne border text-xs">{mp.values.length} values recorded</span></div>
+          <div className="flex gap-2 items-center text-xs"><Link href="/dashboard/tailor/measurements"><Button variant="outline" size="sm">← Back</Button></Link><span className="px-3 py-1 rounded-full bg-champagne border text-xs">{mp.values.length} values recorded</span><DeleteMeasurementButton id={mp.id} displayName={displayName} garmentType={mp.garmentType} variant="detail" /></div>
         </div>
         <MeasurementSimpleForm profile={mp} />
         <Card><CardHeader><CardTitle className="text-sm">History & actions</CardTitle></CardHeader><CardContent className="text-xs text-muted-foreground">
