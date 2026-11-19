@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { TailorQuoteForm } from "@/components/payments/TailorQuoteForm";
+import { findTailorDashboardBookings } from "@/lib/bookings/schema-compat";
 
 // Canonical state machine — same as schema + master prompt
 const allowedTransitions: Record<string,string[]> = {
@@ -74,30 +75,14 @@ export default async function TailorBookingsPage({ searchParams }: { searchParam
         const m:any={}; groups.forEach(g=>m[g.status]=g._count); return m;
       })()
     ]);
-    try {
-      bookings = await prisma.tailoringBooking.findMany({
-        where,
-        include: { customer: { select: { name: true, email: true } }, design: { select: { title: true, slug: true } } },
-        orderBy: { updatedAt: "desc" },
-        skip: (page-1)*pageSize, take: pageSize,
-      });
-    } catch (error: any) {
-      // A code-only deployment can precede the separately reviewed financial migration.
-      // Fall back to the established booking columns so submitted measurement snapshots remain visible.
-      if (error?.code !== "P2022") throw error;
-      financialSchemaReady = false;
-      bookings = await prisma.tailoringBooking.findMany({
-        where,
-        select: {
-          id: true, reference: true, description: true, status: true, estimatedCompletion: true,
-          updatedAt: true, measurementSnapshot: true,
-          customer: { select: { name: true, email: true } },
-          design: { select: { title: true, slug: true } },
-        },
-        orderBy: { updatedAt: "desc" },
-        skip: (page-1)*pageSize, take: pageSize,
-      });
-    }
+    const result = await findTailorDashboardBookings(prisma.tailoringBooking, {
+      where,
+      orderBy: { updatedAt: "desc" },
+      skip: (page-1)*pageSize,
+      take: pageSize,
+    });
+    bookings = result.bookings;
+    financialSchemaReady = result.financialSchemaReady;
   } catch { bookings=[]; }
 
   const variant:Record<string,any> = { REQUESTED:"warning", ACCEPTED:"secondary", IN_PRODUCTION:"plum", READY:"gold", COMPLETED:"success", DECLINED:"muted", CANCELLED:"muted", ON_HOLD:"burgundy" };

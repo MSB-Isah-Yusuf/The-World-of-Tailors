@@ -9,6 +9,7 @@ import Link from "next/link";
 import { FulfillmentConfirmationButton } from "@/components/payments/FulfillmentConfirmationButton";
 import { CustomerRefundRequest } from "@/components/payments/CustomerRefundRequest";
 import { CustomerDisputeRequest } from "@/components/payments/CustomerDisputeRequest";
+import { customerBookingDetailLegacySelect } from "@/lib/bookings/schema-compat";
 
 function money(minor: bigint | null | undefined, currency = "NGN") {
   if (minor == null) return "—";
@@ -34,15 +35,7 @@ export default async function BookingDetail({ params }: { params: Promise<{ id: 
     // quote/payment fields stay absent until their migration has been applied.
     if (error?.code === "P2022") {
       try {
-        booking = await prisma.tailoringBooking.findUnique({ where: { id }, select: {
-          id: true, reference: true, customerId: true, tailorId: true, designId: true,
-          description: true, status: true, estimatedCompletion: true, agreedPrice: true,
-          paymentStatus: true,
-          tailor: { select: { businessName: true, slug: true } },
-          design: { select: { title: true, slug: true } },
-          statusHistory: { orderBy: { createdAt: "asc" } },
-          notes: { orderBy: { createdAt: "desc" }, take: 5 },
-        } });
+        booking = await prisma.tailoringBooking.findUnique({ where: { id }, select: customerBookingDetailLegacySelect });
       } catch {}
     }
   }

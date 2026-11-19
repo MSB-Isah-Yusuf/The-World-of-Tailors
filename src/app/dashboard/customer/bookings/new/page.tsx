@@ -8,6 +8,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { nanoid } from "nanoid";
 import { MEASUREMENT_FIELDS } from "@/lib/measurements";
+import { createBookingReturningId } from "@/lib/bookings/schema-compat";
 
 export default async function NewBooking({ searchParams }: { searchParams: Promise<{ tailor?: string; design?: string }> }) {
   const sp = await searchParams;
@@ -45,20 +46,15 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
       else if (d) throw new Error("Design does not belong to this tailor");
     }
     const ref = `SC-${new Date().getFullYear()}-${nanoid(6).toUpperCase()}`;
-    const booking = await prisma.tailoringBooking.create({
-      data: {
-        reference: ref,
-        customerId: (session.user as any).id,
-        tailorId: tailor.id,
-        designId,
-        description: instructions,
-        status: "REQUESTED",
-        measurementSnapshot: snapshot as any,
-        agreedPrice: null,
-      },
-      // Keep the create response to columns in the pre-payment booking schema. The
-      // financial migration is intentionally deployed separately and may lag the app.
-      select: { id: true },
+    const booking = await createBookingReturningId(prisma.tailoringBooking, {
+      reference: ref,
+      customerId: (session.user as any).id,
+      tailorId: tailor.id,
+      designId,
+      description: instructions,
+      status: "REQUESTED",
+      measurementSnapshot: snapshot as any,
+      agreedPrice: null,
     });
     await prisma.bookingStatusHistory.create({ data: { bookingId: booking.id, toStatus: "REQUESTED", changedBy: (session.user as any).id } });
     await prisma.notification.create({ data: { userId: tailor.userId, title: "New booking request", message: `Booking ${ref} — review ${Object.keys(snapshot).length} measurements`, type: "booking", link: "/dashboard/tailor/bookings" } });
