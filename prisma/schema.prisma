@@ -61,6 +61,14 @@ enum PaymentStatus {
   FAILED
   REFUNDED
   CANCELLED
+  ABANDONED
+  REVERSED
+  DEPOSIT_PENDING
+  PARTIALLY_PAID
+  FULLY_PAID
+  REFUND_PENDING
+  PARTIALLY_REFUNDED
+  REVIEW_REQUIRED
 }
 
 enum DeliveryType {
@@ -121,36 +129,48 @@ enum InviteStatus {
 }
 
 model User {
-  id            String    @id @default(cuid())
+  id            String     @id @default(cuid())
   name          String
-  email         String    @unique
+  email         String     @unique
   emailVerified DateTime?
   passwordHash  String?
   image         String?
-  role          Role      @default(CUSTOMER)
+  role          Role       @default(CUSTOMER)
   status        UserStatus @default(ACTIVE)
   phone         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
-  accounts      Account[]
-  sessions      Session[]
+  accounts Account[]
+  sessions Session[]
 
-  tailorProfile TailorProfile?
-  sellerProfile SellerProfile?
+  tailorProfile   TailorProfile?
+  sellerProfile   SellerProfile?
   customerProfile CustomerProfile?
 
-  tailorBookingsAsCustomer TailoringBooking[] @relation("CustomerBookings")
-  fabricOrders FabricOrder[]
-  reviews      Review[]
-  favorites    Favorite[]
-  notifications Notification[]
-  cart         Cart?
-  addresses    CustomerAddress[]
-  measurementProfiles MeasurementProfile[]
-  auditLogs    AuditLog[]
-  preferences  UserPreference?
-  linkedTailorCustomers TailorCustomer[] @relation("UserLinkedTailorCustomer")
+  tailorBookingsAsCustomer TailoringBooking[]   @relation("CustomerBookings")
+  fabricOrders             FabricOrder[]
+  reviews                  Review[]
+  favorites                Favorite[]
+  notifications            Notification[]
+  cart                     Cart?
+  addresses                CustomerAddress[]
+  measurementProfiles      MeasurementProfile[]
+  auditLogs                AuditLog[]
+  preferences              UserPreference?
+  linkedTailorCustomers    TailorCustomer[]     @relation("UserLinkedTailorCustomer")
+  paymentObligations       PaymentObligation[]
+  commissionRulesCreated   CommissionRule[]     @relation("CommissionRuleCreatedBy")
+  commissionRulesUpdated   CommissionRule[]     @relation("CommissionRuleUpdatedBy")
+  payoutsRequested         Payout[]             @relation("PayoutRequestedBy")
+  payoutsApproved          Payout[]             @relation("PayoutApprovedBy")
+  payoutsSecondApproved    Payout[]             @relation("PayoutSecondApprovedBy")
+  refundsRequested         Refund[]             @relation("RefundRequestedBy")
+  refundsApproved          Refund[]             @relation("RefundApprovedBy")
+  refundsSecondApproved    Refund[]             @relation("RefundSecondApprovedBy")
+  disputesAsCustomer       PaymentDispute[]     @relation("DisputeCustomer")
+  disputesAssigned         PaymentDispute[]     @relation("DisputeAdmin")
+  fabricOrderGroups        FabricOrderGroup[]
 
   @@index([role])
   @@index([status])
@@ -170,6 +190,7 @@ model Account {
   id_token          String?
   session_state     String?
   user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([provider, providerAccountId])
 }
 
@@ -185,47 +206,52 @@ model VerificationToken {
   identifier String
   token      String   @unique
   expires    DateTime
+
   @@unique([identifier, token])
 }
 
 model TailorProfile {
-  id                String   @id @default(cuid())
-  userId            String   @unique
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  businessName      String
-  slug              String   @unique
-  bio               String?
-  specialties       String
-  services          String?
-  startingPrice     Float?
-  currency          String   @default("NGN")
-  turnaroundDays    Int?
-  experienceYears   Int?
-  profileImage      String?
-  businessStatus    BusinessStatus @default(PENDING)
-  isPublished       Boolean  @default(false)
-  country           String?
-  countryCode       String?  @default("NG")
-  state             String?
-  stateCode         String?
-  city              String?
-  cityId            String?
-  lga               String?
-  address           String?
-  street            String?
-  postalCode        String?
-  latitude          Float?
-  longitude         Float?
-  serviceRadiusKm   Float?   @default(20)
-  ratingAvg         Float    @default(0)
-  ratingCount       Int      @default(0)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id              String         @id @default(cuid())
+  userId          String         @unique
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessName    String
+  slug            String         @unique
+  bio             String?
+  specialties     String
+  services        String?
+  startingPrice   Float?
+  currency        String         @default("NGN")
+  turnaroundDays  Int?
+  experienceYears Int?
+  profileImage    String?
+  businessStatus  BusinessStatus @default(PENDING)
+  isPublished     Boolean        @default(false)
+  country         String?
+  countryCode     String?        @default("NG")
+  state           String?
+  stateCode       String?
+  city            String?
+  cityId          String?
+  lga             String?
+  address         String?
+  street          String?
+  postalCode      String?
+  latitude        Float?
+  longitude       Float?
+  serviceRadiusKm Float?         @default(20)
+  ratingAvg       Float          @default(0)
+  ratingCount     Int            @default(0)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
-  designs           Design[]
-  bookings          TailoringBooking[]
-  walkInCustomers   TailorCustomer[]
-  measurementProfiles MeasurementProfile[] // tailor-owned measurement profiles
+  designs               Design[]
+  bookings              TailoringBooking[]
+  walkInCustomers       TailorCustomer[]
+  measurementProfiles   MeasurementProfile[] // tailor-owned measurement profiles
+  paymentProfile        SellerPaymentProfile?  @relation("TailorPaymentProfile")
+  commissionRules       CommissionRule[]       @relation("TailorCommissionRules")
+  commissionAllocations CommissionAllocation[] @relation("TailorCommissionAllocations")
+  payouts               Payout[]               @relation("TailorPayouts")
 
   @@index([state])
   @@index([city])
@@ -233,40 +259,44 @@ model TailorProfile {
 }
 
 model SellerProfile {
-  id                String   @id @default(cuid())
-  userId            String   @unique
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  businessName      String
-  slug              String   @unique
-  bio               String?
-  categories        String?
-  profileImage      String?
-  businessStatus    BusinessStatus @default(PENDING)
-  isPublished       Boolean  @default(false)
-  country           String?
-  countryCode       String?  @default("NG")
-  state             String?
-  stateCode         String?
-  city              String?
-  cityId            String?
-  lga               String?
-  address           String?
-  street            String?
-  postalCode        String?
-  latitude          Float?
-  longitude         Float?
-  deliveryZones     String?
-  deliveryMethods   String?
-  deliveryCoverageKm Float?  @default(25)
-  pickupAvailable   Boolean  @default(true)
-  businessHours     String?
-  ratingAvg         Float    @default(0)
-  ratingCount       Int      @default(0)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                 String         @id @default(cuid())
+  userId             String         @unique
+  user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessName       String
+  slug               String         @unique
+  bio                String?
+  categories         String?
+  profileImage       String?
+  businessStatus     BusinessStatus @default(PENDING)
+  isPublished        Boolean        @default(false)
+  country            String?
+  countryCode        String?        @default("NG")
+  state              String?
+  stateCode          String?
+  city               String?
+  cityId             String?
+  lga                String?
+  address            String?
+  street             String?
+  postalCode         String?
+  latitude           Float?
+  longitude          Float?
+  deliveryZones      String?
+  deliveryMethods    String?
+  deliveryCoverageKm Float?         @default(25)
+  pickupAvailable    Boolean        @default(true)
+  businessHours      String?
+  ratingAvg          Float          @default(0)
+  ratingCount        Int            @default(0)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 
-  products          FabricProduct[]
-  orders            FabricOrder[]
+  products              FabricProduct[]
+  orders                FabricOrder[]
+  paymentProfile        SellerPaymentProfile?  @relation("SellerPaymentProfile")
+  commissionRules       CommissionRule[]       @relation("SellerCommissionRules")
+  commissionAllocations CommissionAllocation[] @relation("SellerCommissionAllocations")
+  payouts               Payout[]               @relation("SellerPayouts")
 
   @@index([state])
   @@index([city])
@@ -274,79 +304,79 @@ model SellerProfile {
 }
 
 model CustomerProfile {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String        @id @default(cuid())
+  userId    String        @unique
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   avatar    String?
   bio       String?
   gender    BodyTemplate? // for mannequin default
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 }
 
 model CustomerAddress {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  label     String
-  fullName  String
-  phone     String
-  country   String   @default("Nigeria")
-  countryCode String @default("NG")
-  state     String
-  city      String
-  street    String
-  isDefault Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label       String
+  fullName    String
+  phone       String
+  country     String   @default("Nigeria")
+  countryCode String   @default("NG")
+  state       String
+  city        String
+  street      String
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
 
   @@index([userId])
 }
 
 // ── Walk-in customer: private to tailor, never public ──
 model TailorCustomer {
-  id            String   @id @default(cuid())
-  tailorId      String
-  tailor        TailorProfile @relation(fields: [tailorId], references: [id], onDelete: Cascade)
-  fullName      String
-  phone         String
-  email         String?
-  gender        BodyTemplate @default(MALE)
-  notes         String?
-  referenceImage String?
-  garmentPreference GarmentType? @default(NATIVE_WEAR)
-  inviteStatus  InviteStatus @default(NOT_INVITED)
-  linkedUserId  String? @unique
-  linkedUser    User?    @relation("UserLinkedTailorCustomer", fields: [linkedUserId], references: [id])
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                String        @id @default(cuid())
+  tailorId          String
+  tailor            TailorProfile @relation(fields: [tailorId], references: [id], onDelete: Cascade)
+  fullName          String
+  phone             String
+  email             String?
+  gender            BodyTemplate  @default(MALE)
+  notes             String?
+  referenceImage    String?
+  garmentPreference GarmentType?  @default(NATIVE_WEAR)
+  inviteStatus      InviteStatus  @default(NOT_INVITED)
+  linkedUserId      String?       @unique
+  linkedUser        User?         @relation("UserLinkedTailorCustomer", fields: [linkedUserId], references: [id])
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
-  measurements  MeasurementProfile[]
+  measurements MeasurementProfile[]
 
+  @@unique([tailorId, phone]) // tailor-private dedup, not global
   @@index([tailorId])
   @@index([phone])
-  @@unique([tailorId, phone]) // tailor-private dedup, not global
 }
 
 model MeasurementProfile {
-  id        String   @id @default(cuid())
-  userId    String?  // null for walk-in
-  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tailorId  String?
-  tailor    TailorProfile? @relation(fields: [tailorId], references: [id], onDelete: Cascade)
+  id               String               @id @default(cuid())
+  userId           String? // null for walk-in
+  user             User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tailorId         String?
+  tailor           TailorProfile?       @relation(fields: [tailorId], references: [id], onDelete: Cascade)
   tailorCustomerId String?
-  tailorCustomer TailorCustomer? @relation(fields: [tailorCustomerId], references: [id], onDelete: Cascade)
-  bookingId String?
-  name      String
-  garmentType GarmentType @default(NATIVE_WEAR)
-  bodyTemplate BodyTemplate @default(MALE)
-  status    MeasurementStatus @default(COMPLETED)
-  unit      String   @default("cm")
-  notes     String?
-  recordedBy String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  values    MeasurementValue[]
-  history   MeasurementHistory[]
+  tailorCustomer   TailorCustomer?      @relation(fields: [tailorCustomerId], references: [id], onDelete: Cascade)
+  bookingId        String?
+  name             String
+  garmentType      GarmentType          @default(NATIVE_WEAR)
+  bodyTemplate     BodyTemplate         @default(MALE)
+  status           MeasurementStatus    @default(COMPLETED)
+  unit             String               @default("cm")
+  notes            String?
+  recordedBy       String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  values           MeasurementValue[]
+  history          MeasurementHistory[]
 
   @@index([userId])
   @@index([tailorId])
@@ -354,125 +384,126 @@ model MeasurementProfile {
 }
 
 model MeasurementValue {
-  id        String   @id @default(cuid())
+  id        String             @id @default(cuid())
   profileId String
   profile   MeasurementProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  key       String   // e.g. shoulder, chest, waist, inseam
+  key       String // e.g. shoulder, chest, waist, inseam
   value     Float
-  unit      String   @default("cm")
+  unit      String             @default("cm")
 }
 
 model MeasurementHistory {
-  id        String   @id @default(cuid())
+  id        String             @id @default(cuid())
   profileId String
   profile   MeasurementProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
   changedBy String?
   fromJson  Json?
   toJson    Json?
   note      String?
-  createdAt DateTime @default(now())
+  createdAt DateTime           @default(now())
 }
 
 model MeasurementDefinition {
-  id          String   @id @default(cuid())
-  key         String   @unique // shoulder, chest, waist etc.
-  labelEn     String
-  labelHa     String?
-  category    String   // upper_body, waist_torso, lower_body, other
+  id           String        @id @default(cuid())
+  key          String        @unique // shoulder, chest, waist etc.
+  labelEn      String
+  labelHa      String?
+  category     String // upper_body, waist_torso, lower_body, other
   garmentTypes GarmentType[] // which garments use this
-  gender      BodyTemplate? // null = both
-  unitDefault String   @default("cm")
-  min         Float?
-  max         Float?
-  helpEn      String?
-  helpHa      String?
-  sortOrder   Int      @default(0)
+  gender       BodyTemplate? // null = both
+  unitDefault  String        @default("cm")
+  min          Float?
+  max          Float?
+  helpEn       String?
+  helpHa       String?
+  sortOrder    Int           @default(0)
 }
 
 model DesignCategory {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  slug      String   @unique
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
   description String?
-  designs   Design[]
+  designs     Design[]
 }
 
 model Design {
-  id              String   @id @default(cuid())
-  tailorId        String
-  tailor          TailorProfile @relation(fields: [tailorId], references: [id], onDelete: Cascade)
-  categoryId      String?
-  category        DesignCategory? @relation(fields: [categoryId], references: [id])
-  title           String
-  slug            String   @unique
-  description     String?
-  price           Float?
-  currency        String   @default("NGN")
-  turnaroundDays  Int?
-  isPublished     Boolean  @default(false)
-  isArchived      Boolean  @default(false)
-  tags            String?
-  clothingType    String?
-  coverImageId    String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  images          DesignImage[]
-  bookings        TailoringBooking[]
+  id             String             @id @default(cuid())
+  tailorId       String
+  tailor         TailorProfile      @relation(fields: [tailorId], references: [id], onDelete: Cascade)
+  categoryId     String?
+  category       DesignCategory?    @relation(fields: [categoryId], references: [id])
+  title          String
+  slug           String             @unique
+  description    String?
+  price          Float?
+  currency       String             @default("NGN")
+  turnaroundDays Int?
+  isPublished    Boolean            @default(false)
+  isArchived     Boolean            @default(false)
+  tags           String?
+  clothingType   String?
+  coverImageId   String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  images         DesignImage[]
+  bookings       TailoringBooking[]
 }
 
 model DesignImage {
-  id        String   @id @default(cuid())
+  id        String  @id @default(cuid())
   designId  String
-  design    Design   @relation(fields: [designId], references: [id], onDelete: Cascade)
+  design    Design  @relation(fields: [designId], references: [id], onDelete: Cascade)
   url       String
   alt       String?
-  sortOrder Int      @default(0)
-  isCover   Boolean  @default(false)
+  sortOrder Int     @default(0)
+  isCover   Boolean @default(false)
 }
 
 model FabricCategory {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  slug      String   @unique
-  products  FabricProduct[]
+  id       String          @id @default(cuid())
+  name     String          @unique
+  slug     String          @unique
+  products FabricProduct[]
 }
 
 model FabricProduct {
-  id              String   @id @default(cuid())
-  sellerId        String
-  seller          SellerProfile @relation(fields: [sellerId], references: [id], onDelete: Cascade)
-  categoryId      String?
-  category        FabricCategory? @relation(fields: [categoryId], references: [id])
-  name            String
-  slug            String   @unique
-  description     String?
-  material        String?
-  color           String?
-  pattern         String?
-  price           Float
-  currency        String   @default("NGN")
-  unit            String   @default("metre")
-  stock           Float    @default(0)
-  reserved        Float    @default(0)
-  minOrderQty     Float    @default(1)
-  isPublished     Boolean  @default(false)
-  deliveryEligible Boolean @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  images          FabricProductImage[]
-  orderItems      FabricOrderItem[]
+  id               String               @id @default(cuid())
+  sellerId         String
+  seller           SellerProfile        @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  categoryId       String?
+  category         FabricCategory?      @relation(fields: [categoryId], references: [id])
+  name             String
+  slug             String               @unique
+  description      String?
+  material         String?
+  color            String?
+  pattern          String?
+  price            Float
+  priceMinor       BigInt? // Canonical price in currency minor units (NGN kobo); legacy price retained for compatibility
+  currency         String               @default("NGN")
+  unit             String               @default("metre")
+  stock            Float                @default(0)
+  reserved         Float                @default(0)
+  minOrderQty      Float                @default(1)
+  isPublished      Boolean              @default(false)
+  deliveryEligible Boolean              @default(true)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  images           FabricProductImage[]
+  orderItems       FabricOrderItem[]
 
   @@index([sellerId])
   @@index([isPublished])
 }
 
 model FabricProductImage {
-  id        String   @id @default(cuid())
+  id        String        @id @default(cuid())
   productId String
   product   FabricProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
   url       String
   alt       String?
-  sortOrder Int      @default(0)
+  sortOrder Int           @default(0)
 }
 
 model InventoryMovement {
@@ -484,59 +515,68 @@ model InventoryMovement {
 }
 
 model TailoringBooking {
-  id                  String   @id @default(cuid())
-  reference           String   @unique
-  customerId          String
-  customer            User     @relation("CustomerBookings", fields: [customerId], references: [id])
-  tailorId            String
-  tailor              TailorProfile @relation(fields: [tailorId], references: [id])
-  designId            String?
-  design              Design?  @relation(fields: [designId], references: [id])
-  description         String?
-  specialInstructions String?
-  status              BookingStatus @default(REQUESTED)
-  requestedDate       DateTime @default(now())
-  estimatedCompletion DateTime?
-  agreedPrice         Float?
-  currency            String   @default("NGN")
-  paymentStatus       PaymentStatus @default(PENDING)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                           String        @id @default(cuid())
+  reference                    String        @unique
+  customerId                   String
+  customer                     User          @relation("CustomerBookings", fields: [customerId], references: [id])
+  tailorId                     String
+  tailor                       TailorProfile @relation(fields: [tailorId], references: [id])
+  designId                     String?
+  design                       Design?       @relation(fields: [designId], references: [id])
+  description                  String?
+  specialInstructions          String?
+  status                       BookingStatus @default(REQUESTED)
+  requestedDate                DateTime      @default(now())
+  estimatedCompletion          DateTime?
+  agreedPrice                  Float?
+  agreedAmountMinor            BigInt? // Canonical quoted total in currency minor units
+  depositAmountMinor           BigInt?
+  quoteAcceptedAt              DateTime?
+  quoteExpiresAt               DateTime?
+  quoteStatus                  String        @default("NOT_QUOTED")
+  quoteDetails                 Json?
+  fulfillmentConfirmedAt       DateTime?
+  fulfillmentConfirmedByUserId String?
+  currency                     String        @default("NGN")
+  paymentStatus                PaymentStatus @default(PENDING)
+  createdAt                    DateTime      @default(now())
+  updatedAt                    DateTime      @updatedAt
 
   statusHistory       BookingStatusHistory[]
   notes               BookingNote[]
   measurementSnapshot Json?
   deliveries          Delivery[]
   payments            Payment[]
+  paymentObligations  PaymentObligation[]
 }
 
 model BookingStatusHistory {
-  id        String   @id @default(cuid())
-  bookingId String
-  booking   TailoringBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  id         String           @id @default(cuid())
+  bookingId  String
+  booking    TailoringBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   fromStatus String?
   toStatus   String
   changedBy  String?
   message    String?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime         @default(now())
 }
 
 model BookingNote {
-  id        String   @id @default(cuid())
-  bookingId String
-  booking   TailoringBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  authorId  String?
-  isInternal Boolean @default(false)
-  message   String
-  createdAt DateTime @default(now())
+  id         String           @id @default(cuid())
+  bookingId  String
+  booking    TailoringBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  authorId   String?
+  isInternal Boolean          @default(false)
+  message    String
+  createdAt  DateTime         @default(now())
 }
 
 model Cart {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String     @id @default(cuid())
+  userId    String     @unique
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
   items     CartItem[]
 }
 
@@ -550,102 +590,142 @@ model CartItem {
 }
 
 model FabricOrder {
-  id              String   @id @default(cuid())
-  reference       String   @unique
-  customerId      String
-  customer        User     @relation(fields: [customerId], references: [id])
-  sellerId        String
-  seller          SellerProfile @relation(fields: [sellerId], references: [id])
-  status          OrderStatus @default(PENDING)
-  subtotal        Float
-  deliveryFee     Float    @default(0)
-  total           Float
-  currency        String   @default("NGN")
-  paymentStatus   PaymentStatus @default(PENDING)
-  deliveryType    DeliveryType @default(TO_CUSTOMER)
-  deliveryAddress Json?
-  tailorDestinationId String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  items           FabricOrderItem[]
-  deliveries      Delivery[]
-  payments        Payment[]
+  id                           String              @id @default(cuid())
+  reference                    String              @unique
+  customerId                   String
+  customer                     User                @relation(fields: [customerId], references: [id])
+  sellerId                     String
+  seller                       SellerProfile       @relation(fields: [sellerId], references: [id])
+  status                       OrderStatus         @default(PENDING)
+  subtotal                     Float
+  subtotalMinor                BigInt?
+  deliveryFee                  Float               @default(0)
+  deliveryFeeMinor             BigInt?
+  total                        Float
+  totalMinor                   BigInt?
+  orderGroupId                 String?
+  orderGroup                   FabricOrderGroup?   @relation(fields: [orderGroupId], references: [id], onDelete: SetNull)
+  currency                     String              @default("NGN")
+  paymentStatus                PaymentStatus       @default(PENDING)
+  deliveryType                 DeliveryType        @default(TO_CUSTOMER)
+  deliveryAddress              Json?
+  tailorDestinationId          String?
+  fulfillmentConfirmedAt       DateTime?
+  fulfillmentConfirmedByUserId String?
+  createdAt                    DateTime            @default(now())
+  updatedAt                    DateTime            @updatedAt
+  items                        FabricOrderItem[]
+  deliveries                   Delivery[]
+  payments                     Payment[]
+  paymentObligations           PaymentObligation[]
 }
 
 model FabricOrderItem {
-  id              String   @id @default(cuid())
-  orderId         String
-  order           FabricOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId       String
-  product         FabricProduct @relation(fields: [productId], references: [id])
-  productName     String
-  unit            String
-  priceSnapshot   Float
-  quantity        Float
-  lineTotal       Float
+  id                 String        @id @default(cuid())
+  orderId            String
+  order              FabricOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId          String
+  product            FabricProduct @relation(fields: [productId], references: [id])
+  productName        String
+  unit               String
+  priceSnapshot      Float
+  priceSnapshotMinor BigInt?
+  quantity           Float
+  lineTotal          Float
+  lineTotalMinor     BigInt?
 }
 
 model Delivery {
-  id              String   @id @default(cuid())
-  fabricOrderId   String?
-  fabricOrder     FabricOrder? @relation(fields: [fabricOrderId], references: [id])
-  bookingId       String?
-  booking         TailoringBooking? @relation(fields: [bookingId], references: [id])
-  type            DeliveryType @default(TO_CUSTOMER)
-  address         Json?
-  status          String   @default("PENDING")
-  trackingCode    String?
-  dispatchedAt    DateTime?
-  deliveredAt     DateTime?
-  createdAt       DateTime @default(now())
-  history         DeliveryStatusHistory[]
+  id            String                  @id @default(cuid())
+  fabricOrderId String?
+  fabricOrder   FabricOrder?            @relation(fields: [fabricOrderId], references: [id])
+  bookingId     String?
+  booking       TailoringBooking?       @relation(fields: [bookingId], references: [id])
+  type          DeliveryType            @default(TO_CUSTOMER)
+  address       Json?
+  status        String                  @default("PENDING")
+  trackingCode  String?
+  dispatchedAt  DateTime?
+  deliveredAt   DateTime?
+  createdAt     DateTime                @default(now())
+  history       DeliveryStatusHistory[]
 }
 
 model DeliveryStatusHistory {
-  id        String   @id @default(cuid())
+  id         String   @id @default(cuid())
   deliveryId String
-  delivery  Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
-  status    String
-  message   String?
-  createdAt DateTime @default(now())
+  delivery   Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  status     String
+  message    String?
+  createdAt  DateTime @default(now())
 }
 
 model Payment {
-  id              String   @id @default(cuid())
-  reference       String   @unique
-  fabricOrderId   String?
-  fabricOrder     FabricOrder? @relation(fields: [fabricOrderId], references: [id])
-  bookingId       String?
-  booking         TailoringBooking? @relation(fields: [bookingId], references: [id])
-  amount          Float
-  currency        String   @default("NGN")
-  provider        String   @default("paystack")
-  providerRef     String?
-  status          PaymentStatus @default(PENDING)
-  createdAt       DateTime @default(now())
+  id                    String                 @id @default(cuid())
+  reference             String                 @unique // Internal payment reference; provider attempt references are stored separately
+  fabricOrderId         String?
+  fabricOrder           FabricOrder?           @relation(fields: [fabricOrderId], references: [id])
+  bookingId             String?
+  booking               TailoringBooking?      @relation(fields: [bookingId], references: [id])
+  obligationId          String?
+  obligation            PaymentObligation?     @relation(fields: [obligationId], references: [id], onDelete: SetNull)
+  amount                Float // Legacy major-unit amount retained while old dashboards migrate
+  amountMinor           BigInt? // Canonical amount in integer minor units
+  currency              String                 @default("NGN")
+  category              String?
+  provider              String                 @default("paystack")
+  providerRef           String?
+  providerTransactionId String?
+  providerFeeMinor      BigInt?
+  status                PaymentStatus          @default(PENDING)
+  paidAt                DateTime?
+  verifiedAt            DateTime?
+  metadata              Json?
+  attempts              PaymentAttempt[]
+  commissionAllocations CommissionAllocation[]
+  ledgerEntries         FinancialLedgerEntry[]
+  refunds               Refund[]
+  disputes              PaymentDispute[]
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  @@index([status, createdAt])
+  @@index([obligationId])
+  @@index([bookingId])
+  @@index([fabricOrderId])
 }
 
 model PaymentWebhookEvent {
-  id        String   @id @default(cuid())
-  provider  String
-  eventId   String   @unique
-  payload   Json
-  processed Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id                   String    @id @default(cuid())
+  provider             String
+  eventId              String    @unique // Stable, deterministic idempotency fingerprint
+  eventType            String?
+  transactionReference String?
+  payloadHash          String?
+  signatureVerified    Boolean   @default(false)
+  processingStatus     String    @default("RECEIVED")
+  errorSummary         String?
+  processedAt          DateTime?
+  payload              Json // Sanitized provider payload summary; never card or bank credentials
+  processed            Boolean   @default(false) // Legacy compatibility field
+  createdAt            DateTime  @default(now())
+
+  @@index([processingStatus, createdAt])
+  @@index([transactionReference])
 }
 
 model Review {
-  id        String   @id @default(cuid())
-  authorId  String
-  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  tailorId  String?
-  sellerId  String?
-  designId  String?
-  productId String?
-  rating    Int
-  comment   String?
-  isPublished Boolean @default(true)
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  tailorId    String?
+  sellerId    String?
+  designId    String?
+  productId   String?
+  rating      Int
+  comment     String?
+  isPublished Boolean  @default(true)
+  createdAt   DateTime @default(now())
 }
 
 model Favorite {
@@ -655,6 +735,7 @@ model Favorite {
   designId  String?
   productId String?
   createdAt DateTime @default(now())
+
   @@unique([userId, designId])
 }
 
@@ -679,32 +760,33 @@ model AuditLog {
   entityId  String?
   metadata  Json?
   createdAt DateTime @default(now())
+
   @@index([action])
   @@index([entity])
 }
 
 // ── Location reference data (Nigeria 36 + FCT with cities/LGAs) ──
 model Country {
-  code      String @id // NG, GH, etc.
-  name      String @unique
-  dialCode  String?
-  states    StateRegion[]
+  code     String        @id // NG, GH, etc.
+  name     String        @unique
+  dialCode String?
+  states   StateRegion[]
 }
 
 model StateRegion {
-  id        String @id @default(cuid())
+  id          String  @id @default(cuid())
   countryCode String
-  country   Country @relation(fields: [countryCode], references: [code])
-  name      String
-  code      String? // e.g. LA, AB
-  cities    City[]
+  country     Country @relation(fields: [countryCode], references: [code])
+  name        String
+  code        String? // e.g. LA, AB
+  cities      City[]
 
   @@unique([countryCode, name])
   @@index([countryCode])
 }
 
 model City {
-  id        String @id @default(cuid())
+  id        String      @id @default(cuid())
   stateId   String
   state     StateRegion @relation(fields: [stateId], references: [id], onDelete: Cascade)
   name      String
@@ -712,22 +794,409 @@ model City {
   latitude  Float?
   longitude Float?
 
-  @@index([stateId])
   @@unique([stateId, name])
+  @@index([stateId])
 }
 
 // ── User preferences: theme, language, browsing location ──
 model UserPreference {
-  userId      String @id
-  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  theme       ThemePref @default(SYSTEM)
-  language    LanguagePref @default(EN)
+  userId          String       @id
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  theme           ThemePref    @default(SYSTEM)
+  language        LanguagePref @default(EN)
   browsingCountry String?
   browsingState   String?
   browsingCity    String?
   browsingLat     Float?
   browsingLng     Float?
-  updatedAt   DateTime @updatedAt
+  updatedAt       DateTime     @updatedAt
+}
+
+// ── Financial core — additive models. Legacy Float columns remain for safe migration; new writes use minor units. ──
+model FabricOrderGroup {
+  id                  String              @id @default(cuid())
+  reference           String              @unique
+  customerId          String
+  customer            User                @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  currency            String              @default("NGN")
+  subtotalMinor       BigInt
+  deliveryTotalMinor  BigInt
+  totalMinor          BigInt
+  status              String              @default("PENDING")
+  deliveryType        DeliveryType        @default(TO_CUSTOMER)
+  deliveryAddress     Json?
+  tailorDestinationId String?
+  expiresAt           DateTime?
+  orders              FabricOrder[]
+  paymentObligations  PaymentObligation[]
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  @@index([customerId, createdAt])
+  @@index([status, createdAt])
+}
+
+model PaymentObligation {
+  id                             String            @id @default(cuid())
+  customerId                     String
+  customer                       User              @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  bookingId                      String?
+  booking                        TailoringBooking? @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  orderGroupId                   String?
+  orderGroup                     FabricOrderGroup? @relation(fields: [orderGroupId], references: [id], onDelete: Restrict)
+  fabricOrderId                  String?
+  fabricOrder                    FabricOrder?      @relation(fields: [fabricOrderId], references: [id], onDelete: Restrict)
+  type                           String // FULL, DEPOSIT, FINAL_BALANCE, FABRIC_ORDER
+  totalMinor                     BigInt
+  paidMinor                      BigInt            @default(0)
+  outstandingMinor               BigInt
+  currency                       String            @default("NGN")
+  status                         String            @default("UNPAID")
+  dueAt                          DateTime?
+  expiresAt                      DateTime?
+  acceptedAt                     DateTime?
+  commissionRuleId               String?
+  commissionRule                 CommissionRule?   @relation(fields: [commissionRuleId], references: [id], onDelete: SetNull)
+  commissionBaseSnapshot         String?
+  commissionBaseMinor            BigInt?
+  commissionRateBps              Int               @default(0)
+  commissionFixedFeeMinor        BigInt            @default(0)
+  commissionMinimumMinorSnapshot BigInt?
+  commissionMaximumMinorSnapshot BigInt?
+  commissionTotalMinor           BigInt            @default(0)
+  commissionPaidMinor            BigInt            @default(0)
+  feePolicySnapshot              String            @default("PLATFORM")
+  sharedFeePlatformBpsSnapshot   Int?
+  settlementPolicySnapshot       String            @default("DISABLED")
+  payments                       Payment[]
+  createdAt                      DateTime          @default(now())
+  updatedAt                      DateTime          @updatedAt
+
+  @@index([customerId, status])
+  @@index([bookingId, status])
+  @@index([fabricOrderId, status])
+  @@index([orderGroupId, status])
+  @@index([status, dueAt])
+}
+
+model PaymentAttempt {
+  id                      String    @id @default(cuid())
+  paymentId               String
+  payment                 Payment   @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  providerReference       String    @unique
+  attemptNumber           Int
+  status                  String    @default("INITIALIZING")
+  authorizationUrl        String?
+  accessCode              String?
+  providerResponseSummary Json?
+  initiatedAt             DateTime  @default(now())
+  completedAt             DateTime?
+  failureReason           String?
+  createdAt               DateTime  @default(now())
+
+  @@unique([paymentId, attemptNumber])
+  @@index([status, initiatedAt])
+}
+
+model CommissionRule {
+  id                     String                 @id @default(cuid())
+  category               String // TAILORING_SERVICE or FABRIC_SALE
+  commissionBase         String? // SERVICE_TOTAL, MERCHANDISE_SUBTOTAL, or ORDER_TOTAL; required when activating a rule
+  rateBps                Int // 1000 = 10%; avoids floating-point rate math
+  fixedFeeMinor          BigInt                 @default(0)
+  currency               String                 @default("NGN")
+  minimumCommissionMinor BigInt?
+  maximumCommissionMinor BigInt?
+  effectiveFrom          DateTime
+  effectiveTo            DateTime?
+  active                 Boolean                @default(true)
+  version                Int                    @default(1)
+  tailorProfileId        String?
+  tailorProfile          TailorProfile?         @relation("TailorCommissionRules", fields: [tailorProfileId], references: [id], onDelete: SetNull)
+  sellerProfileId        String?
+  sellerProfile          SellerProfile?         @relation("SellerCommissionRules", fields: [sellerProfileId], references: [id], onDelete: SetNull)
+  createdById            String?
+  createdBy              User?                  @relation("CommissionRuleCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById            String?
+  updatedBy              User?                  @relation("CommissionRuleUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  obligations            PaymentObligation[]
+  allocations            CommissionAllocation[]
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+
+  @@index([category, active, effectiveFrom, effectiveTo])
+  @@index([tailorProfileId, category, active])
+  @@index([sellerProfileId, category, active])
+}
+
+model CommissionAllocation {
+  id                    String          @id @default(cuid())
+  paymentId             String
+  payment               Payment         @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  ruleId                String?
+  rule                  CommissionRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  category              String
+  rateBps               Int
+  grossAmountMinor      BigInt
+  commissionAmountMinor BigInt
+  sellerAmountMinor     BigInt
+  currency              String          @default("NGN")
+  feePolicy             String          @default("PLATFORM")
+  tailorProfileId       String?
+  tailorProfile         TailorProfile?  @relation("TailorCommissionAllocations", fields: [tailorProfileId], references: [id], onDelete: SetNull)
+  sellerProfileId       String?
+  sellerProfile         SellerProfile?  @relation("SellerCommissionAllocations", fields: [sellerProfileId], references: [id], onDelete: SetNull)
+  createdAt             DateTime        @default(now())
+
+  @@unique([paymentId, category])
+  @@index([tailorProfileId, createdAt])
+  @@index([sellerProfileId, createdAt])
+}
+
+model SellerPaymentProfile {
+  id                            String                 @id @default(cuid())
+  tailorProfileId               String?                @unique
+  tailorProfile                 TailorProfile?         @relation("TailorPaymentProfile", fields: [tailorProfileId], references: [id], onDelete: Cascade)
+  sellerProfileId               String?                @unique
+  sellerProfile                 SellerProfile?         @relation("SellerPaymentProfile", fields: [sellerProfileId], references: [id], onDelete: Cascade)
+  sellerType                    String
+  accountHolderName             String?
+  bankName                      String?
+  bankCode                      String?
+  maskedAccountNumber           String?
+  currency                      String                 @default("NGN")
+  paystackSubaccountCode        String?                @unique
+  paystackTransferRecipientCode String?                @unique
+  verificationStatus            String                 @default("NOT_STARTED")
+  payoutEligible                Boolean                @default(false)
+  settlementPolicy              String                 @default("DISABLED") // IMMEDIATE_SPLIT or APPROVED_CONTROLLED_PAYOUT only
+  subaccountActive              Boolean                @default(false)
+  suspendedAt                   DateTime?
+  verifiedAt                    DateTime?
+  payouts                       Payout[]
+  refunds                       Refund[]               @relation("SellerPaymentProfileRefunds")
+  disputes                      PaymentDispute[]       @relation("SellerPaymentProfileDisputes")
+  ledgerEntries                 FinancialLedgerEntry[]
+  balanceSummary                SellerBalanceSummary?
+  createdAt                     DateTime               @default(now())
+  updatedAt                     DateTime               @updatedAt
+
+  @@index([sellerType, verificationStatus, payoutEligible])
+}
+
+model SettlementPolicy {
+  id               String    @id @default(cuid())
+  category         String
+  sellerType       String?
+  tailorProfileId  String?
+  sellerProfileId  String?
+  route            String // IMMEDIATE_SPLIT, CONTROLLED_PAYOUT, DISABLED
+  approvalMode     String    @default("MANUAL")
+  effectiveFrom    DateTime
+  effectiveTo      DateTime?
+  active           Boolean   @default(true)
+  approvedById     String?
+  approvalEvidence String?
+  createdById      String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([category, active, effectiveFrom, effectiveTo])
+  @@index([tailorProfileId, active])
+  @@index([sellerProfileId, active])
+}
+
+model SellerBalanceSummary {
+  id                      String               @id @default(cuid())
+  sellerPaymentProfileId  String               @unique
+  sellerPaymentProfile    SellerPaymentProfile @relation(fields: [sellerPaymentProfileId], references: [id], onDelete: Cascade)
+  currency                String               @default("NGN")
+  pendingMinor            BigInt               @default(0)
+  awaitingFulfilmentMinor BigInt               @default(0)
+  heldMinor               BigInt               @default(0)
+  payableMinor            BigInt               @default(0)
+  processingMinor         BigInt               @default(0)
+  paidMinor               BigInt               @default(0)
+  updatedAt               DateTime             @updatedAt
+}
+
+model Payout {
+  id                     String                 @id @default(cuid())
+  sellerPaymentProfileId String
+  sellerPaymentProfile   SellerPaymentProfile   @relation(fields: [sellerPaymentProfileId], references: [id], onDelete: Restrict)
+  tailorProfileId        String?
+  tailorProfile          TailorProfile?         @relation("TailorPayouts", fields: [tailorProfileId], references: [id], onDelete: SetNull)
+  sellerProfileId        String?
+  sellerProfile          SellerProfile?         @relation("SellerPayouts", fields: [sellerProfileId], references: [id], onDelete: SetNull)
+  amountMinor            BigInt
+  currency               String                 @default("NGN")
+  reference              String                 @unique
+  clientRequestId        String?                @unique
+  providerTransferId     String?
+  recipientCode          String?
+  status                 String                 @default("REQUESTED")
+  requestedByUserId      String?
+  requestedBy            User?                  @relation("PayoutRequestedBy", fields: [requestedByUserId], references: [id], onDelete: SetNull)
+  approvedByUserId       String?
+  approvedBy             User?                  @relation("PayoutApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  requiresSecondApproval Boolean                @default(false)
+  secondApprovedByUserId String?
+  secondApprovedBy       User?                  @relation("PayoutSecondApprovedBy", fields: [secondApprovedByUserId], references: [id], onDelete: SetNull)
+  secondApprovedAt       DateTime?
+  requestedAt            DateTime               @default(now())
+  approvedAt             DateTime?
+  initiatedAt            DateTime?
+  completedAt            DateTime?
+  failureReason          String?
+  reversalReference      String?
+  ledgerEntries          FinancialLedgerEntry[]
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+
+  @@index([sellerPaymentProfileId, status, requestedAt])
+  @@index([status, requestedAt])
+}
+
+model FinancialJournal {
+  id             String                 @id @default(cuid())
+  idempotencyKey String                 @unique
+  sourceType     String
+  sourceId       String
+  currency       String
+  description    String
+  createdById    String?
+  entries        FinancialLedgerEntry[]
+  createdAt      DateTime               @default(now())
+
+  @@index([sourceType, sourceId])
+  @@index([createdAt])
+}
+
+model FinancialLedgerEntry {
+  id                     String                @id @default(cuid())
+  journalId              String
+  journal                FinancialJournal      @relation(fields: [journalId], references: [id], onDelete: Restrict)
+  paymentId              String?
+  payment                Payment?              @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  payoutId               String?
+  payout                 Payout?               @relation(fields: [payoutId], references: [id], onDelete: Restrict)
+  refundId               String?
+  refund                 Refund?               @relation(fields: [refundId], references: [id], onDelete: Restrict)
+  sellerPaymentProfileId String?
+  sellerPaymentProfile   SellerPaymentProfile? @relation(fields: [sellerPaymentProfileId], references: [id], onDelete: Restrict)
+  accountCode            String
+  entryType              String
+  debitMinor             BigInt                @default(0)
+  creditMinor            BigInt                @default(0)
+  currency               String
+  description            String
+  idempotencyKey         String                @unique
+  createdAt              DateTime              @default(now())
+
+  @@index([accountCode, currency, createdAt])
+  @@index([paymentId])
+  @@index([payoutId])
+  @@index([refundId])
+  @@index([sellerPaymentProfileId, accountCode, createdAt])
+}
+
+model Refund {
+  id                         String                 @id @default(cuid())
+  paymentId                  String
+  payment                    Payment                @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  reference                  String                 @unique
+  providerRefundReference    String?                @unique
+  clientRequestId            String?                @unique
+  sellerPaymentProfileId     String?
+  sellerPaymentProfile       SellerPaymentProfile?  @relation("SellerPaymentProfileRefunds", fields: [sellerPaymentProfileId], references: [id], onDelete: Restrict)
+  amountMinor                BigInt
+  commissionReversedMinor    BigInt?
+  sellerReversedMinor        BigInt?
+  sellerPendingReversedMinor BigInt?
+  sellerPayableReversedMinor BigInt?
+  currency                   String                 @default("NGN")
+  reason                     String
+  status                     String                 @default("REQUESTED")
+  requiresSecondApproval     Boolean                @default(true)
+  secondApprovedByUserId     String?
+  secondApprovedBy           User?                  @relation("RefundSecondApprovedBy", fields: [secondApprovedByUserId], references: [id], onDelete: SetNull)
+  secondApprovedAt           DateTime?
+  initiatedByUserId          String?
+  initiatedBy                User?                  @relation("RefundRequestedBy", fields: [initiatedByUserId], references: [id], onDelete: SetNull)
+  approvedByUserId           String?
+  approvedBy                 User?                  @relation("RefundApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  providerResponseSummary    Json?
+  initiatedAt                DateTime?
+  completedAt                DateTime?
+  ledgerEntries              FinancialLedgerEntry[]
+  createdAt                  DateTime               @default(now())
+  updatedAt                  DateTime               @updatedAt
+
+  @@index([paymentId, status])
+  @@index([status, createdAt])
+}
+
+model PaymentDispute {
+  id                     String                @id @default(cuid())
+  clientRequestId        String?               @unique
+  paymentId              String
+  payment                Payment               @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  customerId             String
+  customer               User                  @relation("DisputeCustomer", fields: [customerId], references: [id], onDelete: Restrict)
+  reason                 String
+  evidence               Json?
+  sellerPaymentProfileId String?
+  sellerPaymentProfile   SellerPaymentProfile? @relation("SellerPaymentProfileDisputes", fields: [sellerPaymentProfileId], references: [id], onDelete: Restrict)
+  status                 String                @default("OPEN")
+  assignedAdminId        String?
+  assignedAdmin          User?                 @relation("DisputeAdmin", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  resolution             String?
+  resolvedAt             DateTime?
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+
+  @@index([customerId, status])
+  @@index([assignedAdminId, status])
+  @@index([paymentId, status])
+}
+
+model PaymentReconciliationItem {
+  id               String                @id @default(cuid())
+  reconciliationId String
+  reconciliation   PaymentReconciliation @relation(fields: [reconciliationId], references: [id], onDelete: Cascade)
+  recordType       String                @default("CHARGE") // CHARGE, REFUND, TRANSFER
+  reference        String
+  providerRecordId String?
+  providerStatus   String
+  amountMinor      BigInt
+  currency         String                @default("NGN")
+  internalRecordId String?
+  status           String                @default("UNMATCHED")
+  details          Json?
+  createdAt        DateTime              @default(now())
+
+  @@unique([reconciliationId, recordType, reference])
+  @@index([recordType, status, createdAt])
+}
+
+model PaymentReconciliation {
+  id                 String                      @id @default(cuid())
+  provider           String                      @default("paystack")
+  periodStart        DateTime
+  periodEnd          DateTime
+  currency           String                      @default("NGN")
+  internalTotalMinor BigInt
+  providerTotalMinor BigInt
+  discrepancyMinor   BigInt
+  status             String                      @default("OPEN")
+  reviewedById       String?
+  reviewedAt         DateTime?
+  notes              String?
+  items              PaymentReconciliationItem[]
+  createdAt          DateTime                    @default(now())
+
+  @@index([provider, periodStart, periodEnd])
+  @@index([status, createdAt])
 }
 
 // cache-bust: 2026-11-10T13:46:00Z — force Vercel clean build for postgresql provider

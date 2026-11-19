@@ -9,13 +9,12 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
-    "db:push": "prisma db push",
-    "db:migrate": "prisma migrate dev",
+    "db:push": "node scripts/db-push-local.mjs",
     "db:seed": "tsx prisma/seed.ts",
-    "db:reset": "prisma migrate reset --force && npm run db:seed",
+    "db:reset": "node scripts/reset-local-db.mjs",
     "test": "vitest",
     "test:authz": "tsx tests/authz.test.ts",
-    "vercel-build": "prisma db push --accept-data-loss --skip-generate && prisma generate && node scripts/seed-if-empty.mjs && next build"
+    "vercel-build": "prisma generate && next build"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.4",
@@ -28,14 +27,15 @@
     "framer-motion": "^12.12.1",
     "lucide-react": "^0.475.0",
     "nanoid": "^5.1.5",
-    "next": "^15.5.28",
-    "next-auth": "5.0.0-beta.25",
+    "next": "^15.5.29",
+    "next-auth": "5.0.0-beta.32",
     "prisma": "^6.4.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.54.2",
+    "server-only": "^0.0.1",
     "tailwind-merge": "^3.0.2",
-    "zod": "^3.24.2"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -44,12 +44,20 @@
     "@types/react-dom": "^19.0.3",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.21.0",
-    "eslint-config-next": "^15.5.28",
-    "postcss": "^8.5.1",
+    "eslint-config-next": "^15.5.29",
+    "postcss": "^8.5.31",
     "tailwindcss": "^3.4.17",
     "tailwindcss-animate": "^1.0.7",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
-    "vitest": "^3.0.0"
+    "vitest": "^4.1.12"
+  },
+  "overrides": {
+    "@prisma/config": {
+      "deepmerge-ts": "8.0.2"
+    },
+    "next": {
+      "postcss": "8.5.31"
+    }
   }
 }

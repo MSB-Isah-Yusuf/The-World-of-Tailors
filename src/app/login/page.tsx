@@ -27,7 +27,7 @@ async function getRedirectForEmail(email: string) {
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; callbackUrl?: string; registered?: string; email?: string }> }) {
   const sp = await searchParams;
-  const demoMode = process.env.DEMO_MODE !== "false";
+  const demoMode = process.env.NODE_ENV !== "production" && process.env.DEMO_MODE === "true";
 
   async function loginAction(formData: FormData) {
     "use server";
@@ -52,7 +52,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
 
   async function demoLogin(formData: FormData) {
     "use server";
-    if (process.env.DEMO_MODE === "false") redirect("/login?error=DemoDisabled");
+    if (process.env.NODE_ENV === "production" || process.env.DEMO_MODE !== "true") redirect("/login?error=DemoDisabled");
     const email = String(formData.get("email") || "").toLowerCase().trim();
     const allowed = ["customer@demo.twt.ng", "tailor@demo.twt.ng", "seller@demo.twt.ng", "admin@demo.twt.ng"];
     if (!allowed.includes(email)) redirect("/login?error=DemoNotAllowed");
@@ -66,7 +66,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   }
 
   const errorMap: Record<string, string> = {
-    CredentialsSignin: "Invalid email or password. Check your spelling and try again, or use a demo account below.",
+    CredentialsSignin: "Invalid email or password. Check your details and try again.",
     MissingCSRF: "Session expired — please try again.",
     MissingFields: "Please fill in both email and password.",
     DemoDisabled: "Demo mode is disabled on this environment.",
@@ -114,11 +114,11 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
               <form action={loginAction} className="space-y-4">
                 <div>
                   <Label htmlFor="email">Email</Label>
-                  <Input id="email" name="email" type="email" placeholder="you@example.com" required defaultValue={sp?.email || "customer@demo.twt.ng"} />
+                  <Input id="email" name="email" type="email" placeholder="you@example.com" required defaultValue={sp?.email || ""} />
                 </div>
                 <div>
                   <Label htmlFor="password">Password</Label>
-                  <Input id="password" name="password" type="password" required defaultValue="DemoPass123!" />
+                  <Input id="password" name="password" type="password" required />
                 </div>
                 <Button type="submit" className="w-full" variant="primary">Sign in</Button>
                 <div className="flex justify-between text-sm">
@@ -136,7 +136,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
 
         <div className="lg:col-span-2">
           <Card className="border-gold/30 bg-gradient-champagne-ivory">
-            <CardHeader><CardTitle className="text-base">✦ Demo Access (TWT)</CardTitle><p className="text-xs text-taupe">One-click demo logins — controlled by <code>DEMO_MODE</code> env flag. Disabled when <code>DEMO_MODE=false</code> in production.</p></CardHeader>
+            <CardHeader><CardTitle className="text-base">✦ Local Demo Access</CardTitle><p className="text-xs text-taupe">Non-production convenience only. Demo access cannot be enabled in production, even if the environment flag is set.</p></CardHeader>
             <CardContent className="space-y-3">
               {demoMode ? (
                 <>
@@ -151,14 +151,14 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
                       <button type="submit" className="w-full text-left rounded-xl border bg-white p-3 hover:shadow-card transition">
                         <div className="text-sm font-semibold">{d.label}</div>
                         <div className="text-xs text-taupe">{d.desc}</div>
-                        <div className="text-[11px] text-taupe mt-1">{d.email} / DemoPass123!</div>
+                        <div className="text-[11px] text-taupe mt-1">Local demo account</div>
                       </button>
                     </form>
                   ))}
-                  <p className="text-[11px] text-taupe">Seeded via <code>npm run db:seed</code>. Redirect uses trusted DB role → correct dashboard.</p>
+                  <p className="text-[11px] text-taupe">Use only with a disposable, local, non-production seed database. Never deploy demo credentials or data.</p>
                 </>
               ) : (
-                <p className="text-sm text-taupe">Demo mode is disabled (DEMO_MODE=false). Use real credentials or enable DEMO_MODE in Vercel env.</p>
+                <p className="text-sm text-taupe">Local demo access is disabled. Use your own account credentials.</p>
               )}
             </CardContent>
           </Card>

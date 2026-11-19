@@ -1,42 +1,28 @@
 import { PrismaClient } from "@prisma/client";
+import nextEnv from "@next/env";
 import bcrypt from "bcryptjs";
+nextEnv.loadEnvConfig(process.cwd());
 const prisma = new PrismaClient();
 
-async function main() {
-  console.log("🌱 Seeding The World of Tailors demo data...");
+function assertLocalSeedAllowed() {
+  if (process.env.NODE_ENV === "production") throw new Error("Refusing demo seed in production.");
+  if (process.env.LOCAL_DEMO_SEED_CONFIRM !== "SEED_LOCAL_DEMO_DATA") throw new Error("Set LOCAL_DEMO_SEED_CONFIRM=SEED_LOCAL_DEMO_DATA for an explicit local demo seed.");
+  let url: URL;
+  try { url = new URL(process.env.DATABASE_URL || ""); } catch { throw new Error("A valid local DATABASE_URL is required; no seed data was written."); }
+  if (!["postgres:", "postgresql:"].includes(url.protocol) || !["localhost", "127.0.0.1", "::1", "[::1]"].includes(url.hostname.toLowerCase())) {
+    throw new Error("Refusing demo seed unless DATABASE_URL targets loopback PostgreSQL.");
+  }
+}
 
-  // Clean (order matters)
-  await prisma.paymentWebhookEvent.deleteMany();
-  await prisma.payment.deleteMany();
-  await prisma.deliveryStatusHistory.deleteMany();
-  await prisma.delivery.deleteMany();
-  await prisma.fabricOrderItem.deleteMany();
-  await prisma.fabricOrder.deleteMany();
-  await prisma.bookingNote.deleteMany();
-  await prisma.bookingStatusHistory.deleteMany();
-  await prisma.tailoringBooking.deleteMany();
-  await prisma.cartItem.deleteMany();
-  await prisma.cart.deleteMany();
-  await prisma.designImage.deleteMany();
-  await prisma.design.deleteMany();
-  await prisma.designCategory.deleteMany();
-  await prisma.fabricProductImage.deleteMany();
-  await prisma.fabricProduct.deleteMany();
-  await prisma.fabricCategory.deleteMany();
-  await prisma.inventoryMovement.deleteMany();
-  await prisma.measurementValue.deleteMany();
-  await prisma.measurementProfile.deleteMany();
-  await prisma.customerAddress.deleteMany();
-  await prisma.review.deleteMany();
-  await prisma.favorite.deleteMany();
-  await prisma.notification.deleteMany();
-  await prisma.auditLog.deleteMany();
-  await prisma.tailorProfile.deleteMany();
-  await prisma.sellerProfile.deleteMany();
-  await prisma.customerProfile.deleteMany();
-  await prisma.session.deleteMany();
-  await prisma.account.deleteMany();
-  await prisma.user.deleteMany();
+async function main() {
+  assertLocalSeedAllowed();
+  const existingCounts = await Promise.all([
+    prisma.user.count(), prisma.designCategory.count(), prisma.fabricCategory.count(),
+    prisma.payment.count(), prisma.paymentWebhookEvent.count(), prisma.paymentAttempt.count(),
+    prisma.paymentObligation.count(), prisma.financialJournal.count(), prisma.financialLedgerEntry.count(),
+  ]);
+  if (existingCounts.some((count) => count > 0)) throw new Error("Demo seed only runs on an empty local database and never clears existing data. Use the guarded local reset command if you intentionally want to wipe local data.");
+  console.log("🌱 Seeding The World of Tailors local demo data...");
 
   const hash = await bcrypt.hash("DemoPass123!", 10);
 
@@ -132,6 +118,8 @@ async function main() {
     await prisma.inventoryMovement.create({ data: { productId: p.id, delta: p.stock, reason: "Initial stock" } });
   }
 
+  // Demo rows never claim a real provider capture; keep all seeded payment states PENDING.
+  // Booking/order fulfillment examples are workflow samples only, not settlement evidence.
   // Bookings (40)
   for (let i = 0; i < 40; i++) {
     const customer = i===0 ? demoCustomer : customers[i % customers.length];
@@ -144,7 +132,7 @@ async function main() {
       reference: ref, customerId: customer.id, tailorId: tailor.id, designId: design?.id,
       description: `Booking for ${design?.title || "Bespoke"} — special instructions: ${i%2===0?"Add hidden pocket and gold embroidery":"Make it slim fit, 3/4 sleeves"}`,
       status, requestedDate: new Date(Date.now() - i*86400000), estimatedCompletion: new Date(Date.now() + 7*86400000),
-      agreedPrice: design?.price || 35000, currency: "NGN", paymentStatus: i%3===0? "PAID":"PENDING",
+      agreedPrice: design?.price || 35000, currency: "NGN", paymentStatus: "PENDING",
       measurementSnapshot: { chest: 42, waist: 36, shoulder: 18, sleeve: 24, unit: "in", notes: "Demo measurements" }
     } });
     await prisma.bookingStatusHistory.create({ data: { bookingId: booking.id, fromStatus: null, toStatus: status, changedBy: tailor.userId, message: `Booking ${status.toLowerCase()}` } });
@@ -164,12 +152,12 @@ async function main() {
     const subtotal = product.price * qty;
     const deliveryFee = 2500;
     const order = await prisma.fabricOrder.create({ data: {
-      reference: ref, customerId: customer.id, sellerId: seller.id, status, subtotal, deliveryFee, total: subtotal+deliveryFee, currency: "NGN", paymentStatus: i%4===0? "PAID":"PENDING",
+      reference: ref, customerId: customer.id, sellerId: seller.id, status, subtotal, deliveryFee, total: subtotal+deliveryFee, currency: "NGN", paymentStatus: "PENDING",
       deliveryType: i%3===0? "TO_TAILOR":"TO_CUSTOMER", deliveryAddress: { street: "12 Allen Avenue", city: "Lagos", state: "Lagos" }, tailorDestinationId: i%3===0? tailors[0].id: null
     } });
     await prisma.fabricOrderItem.create({ data: { orderId: order.id, productId: product.id, productName: product.name, unit: product.unit, priceSnapshot: product.price, quantity: qty, lineTotal: subtotal } });
     await prisma.delivery.create({ data: { fabricOrderId: order.id, type: i%3===0? "TO_TAILOR":"TO_CUSTOMER", address: { street: "12 Allen Avenue", city: "Lagos" }, status, trackingCode: `TRK${1000+i}` } });
-    await prisma.payment.create({ data: { reference: `PAY-${ref}`, fabricOrderId: order.id, amount: subtotal+deliveryFee, currency: "NGN", provider: "paystack", status: i%4===0? "PAID":"PENDING" } });
+    await prisma.payment.create({ data: { reference: `PAY-${ref}`, fabricOrderId: order.id, amount: subtotal+deliveryFee, currency: "NGN", provider: "paystack", status: "PENDING" } });
   }
 
   // Reviews (30)

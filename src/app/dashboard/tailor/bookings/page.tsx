@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/rbac";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
+import { TailorQuoteForm } from "@/components/payments/TailorQuoteForm";
 
 // Canonical state machine — same as schema + master prompt
 const allowedTransitions: Record<string,string[]> = {
@@ -141,6 +142,8 @@ export default async function TailorBookingsPage({ searchParams }: { searchParam
                   {allowedTransitions[b.status]?.length===0 && <span className="text-xs text-muted-foreground">Terminal state — no further transitions. See history in DB: BookingStatusHistory + AuditLog.</span>}
                   <Link href={`/api/v1/bookings/${b.id}`} className="ml-auto text-xs underline text-plum self-center">API</Link>
                 </div>
+                {b.status === "ACCEPTED" && <details className="border-t pt-2 dark:border-white/10"><summary className="cursor-pointer text-xs font-semibold dark:text-gold">{b.quoteStatus === "SENT" ? "Update quote" : "Create tailoring quote"}</summary><TailorQuoteForm bookingId={b.id} /></details>}
+                {b.quoteStatus && b.quoteStatus !== "NOT_QUOTED" && <div className="text-[11px] text-muted-foreground">Quote: {b.quoteStatus} • {b.agreedAmountMinor != null ? `₦${(Number(b.agreedAmountMinor) / 100).toLocaleString()}` : "—"}</div>}
               </div>
             ))}
             <div className="flex justify-between text-xs pt-2">

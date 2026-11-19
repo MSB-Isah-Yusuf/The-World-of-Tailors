@@ -1,62 +1,38 @@
-# TWT — UAT Smoke Report — v1.0 + mannequin removal/nav fix (1238954)
+# Payment implementation validation and UAT status
 
-**Date:** 2026-11-13 (Africa/Lagos) — HEAD `1238954` on `origin/main`
-**Build:** `✓ Compiled successfully` — 111 routes, First Load 103kB (46.6kB/54.2kB) — 29/29 vitest green
-**Env:** `.env` DEMO_MODE=true, EMAIL_PROVIDER=console, DB localhost:5432 (not running locally → search/checkout need Neon on Vercel)
-**Preview:** https://3000-iwznin5mlyjvjiep8mxph.e2b.app — `/api/health ✓ { status:ok, demoMode:true }`
+**Snapshot:** 2026-10-19 (Africa/Lagos)
+**Status:** Build/typecheck pass; not approved for production Paystack traffic.
 
-## 1) Automated checks — PASS
-- **vitest 29/29** — Booking state machine (REQUESTED→ACCEPTED→IN_PRODUCTION→READY→COMPLETED + DECLINED/CANCELLED/ON_HOLD), Fabric order PENDING→DELIVERED, Ownership & RBAC (tailorId/customerId/sellerId scoped, measurements private, Paystack idempotency), Cart invariants (stock-reserved, minOrderQty, delivery TO_TAILOR), Paystack HMAC SHA512 (valid/tamper/wrong-secret/missing), Session 30m/15m+12h/8h idle/max, Status least-privilege, Image 5MB/pagination/N+1.
-- **Build:** 111 routes including `/api/forgot-password`, `/api/reset-password`, `/api/search`, `/search`, `/reset-password`, tailor/seller/customer dashboards, checkout. No export errors.
-- **UI smoke (no DB):** `/` `/tailors` `/fabrics` render with fallback demo data (2 tailors, 12 fabrics) — filters chips + Reset work. `/api/search?q=Ankara` correctly returns DB error when DB down, otherwise JSON { counts, results, pagination }.
+This replaces an older UAT note whose date, route count, test count, preview, and deployment assertions were not verified against this payment implementation. It is not evidence of a production database migration, a Paystack test transaction, or live user acceptance.
 
-## 2) Role-based UAT checklist — to run on Vercel (with Neon DB)
+## Automated checks completed
 
-### A) Customer (16-NAV)
-1. `/register/customer` → create → `/login` → lands `/dashboard/customer` ✓
-2. `Discover Tailors` (12 live APPROVED+PUBLISHED) → filter Lagos/Yaba/distance → pagination Next/Prev ✓
-3. `Browse Designs` / `Fabric Marketplace` (12 each) → product page → Add to Cart → `/cart` alias → `/checkout` ✓
-4. Checkout: choose TO_CUSTOMER (street/city/state) OR TO_TAILOR (tailor slug ade-bespoke) → Place Order (global `$transaction` atomic per seller, reserved increment) → PAY- ref → Pay via Paystack → webhook HMAC marks PAID → `stock` decrements → delivery PENDING→CONFIRMED ✓
-5. `My Bookings` → `bookings/new` → tailor → design → description → snapshot frozen → `bookings/[id]` timeline ✓
-6. `Measurements` (read-only) → `Orders` (20) → `orders/[id]` ownership check → `Deliveries` trackingCode → `Messages` booking-linked → `Reviews` → `Addresses` add default → `Notifications` mark-all-read → `Account` bcrypt+revoke → `Privacy` ✓
-7. Password reset: `/forgot-password` → email → console link `/reset-password?token=&email=` → reset (1h single-use, rate 5/15m) ✓
+- `npm run typecheck` — passed.
+- `npx prisma validate` — passed.
+- `npm audit` — zero vulnerabilities after dependency updates and targeted Prisma/Next transitive overrides; a clean `npm ci --legacy-peer-deps` also completed with zero findings.
+- `npm test -- --run` — 7 test files, 45 tests passed. Coverage includes Paystack signature/replay checks, mocked test-key initialization and same-reference verification contracts, production test/live fail-closed gates, production demo-access denial, payment API role and client-amount guards, unsupported-currency checkout rejection, uncertain-attempt locking, amount-mismatch review, duplicate-capture idempotency, integer money/commission/ledger invariants, ledger database idempotency, and booking/order state transitions.
+- `npm run build` — passed; Next.js production build generated 137 routes.
+- Local database safety guard — exercised without making a DB request: remote host and production mode rejected; explicitly confirmed loopback PostgreSQL accepted.
+- Migration rehearsal — executed the generated pre-payment baseline plus `prisma/migrations/20261019000000_marketplace_financial_core/migration.sql` in an in-memory PGlite 0.5.17 runtime (PostgreSQL 18.7 on WASM). A read-only Prisma diff cross-check found all 128 generated current-schema DDL statements represented in the migration (with the safe `Payment.updatedAt` backfill adjustment). Synthetic legacy rows verified NGN case/space canonicalization, amount backfills, unsupported-currency/out-of-range values left NULL, `Payment.updatedAt`, and legacy webhook states. Attempt uniqueness, balanced-journal commit, single-sided amounts, append-only updates, and truncate rejection passed. The first rehearsal caught an index created before `PaymentAttempt`; it was moved after the table/index creation and the migration then passed.
 
-### B) Tailor (18-NAV, mannequin removed)
-1. `/register/tailor` → APPROVED gate → `/dashboard/tailor` overview stats ✓
-2. `Bookings` → accept/decline/on-hold with validated state-machine + notify customer ✓
-3. `Measurements` → `measurements/[id]` — **new simple priority form** (Shoulder→Neck→Arm→Chest/Bust→Shirt→Waist→Trouser in gold, then hip/lab etc) — no SVG — `PATCH /api/tailor/measurements/[id]` with unit, duplicate/print/export ✓
-4. `Design Portfolio` (Palette icon) → create with 5 images, publish toggle, audit revalidate ✓ (now distinct from Production Factory icon)
-5. `Production Tracking` → ACCEPTED→IN_PRODUCTION→READY→COMPLETED pipeline + overdue + notes ✓
-6. `Calendar/Messages/Reviews/Earnings/Profile/Location (LocationPicker)/Verification/Notifications/Account` ✓
+The PGlite rehearsal is useful SQL execution evidence, but it does not replace a rehearsal on the actual PostgreSQL major version, an inspected production schema, or representative target data. Mocked Paystack HTTP contract tests verify request/response handling and environment gates, but do not replace a real Paystack test-mode transaction. One guarded test-mode initialization smoke was rejected by Paystack with HTTP 401; it created no transaction, so no verification request was made. A valid test key is still required.
 
-### C) Fabric Seller (18-NAV)
-1. `/register/seller` → PENDING→APPROVED gate → `/dashboard/seller` stats lowStock/pending/inTransit ✓
-2. `My Products` → togglePublish + `Add New Product` 5 units + minOrderQty ✓
-3. `Categories` counts, `Inventory` atomic, `Stock History` 20/page, `Fabric Orders` customers, `Deliveries` TO_CUSTOMER/TO_TAILOR tracking, `Reviews`, `Sales Reports` live totals, `Earnings` PAID sum, `Profile` bio/city/coverage, `Location` picker, `Delivery Coverage`, `Verification`, `Notifications`, `Account` bcrypt ✓
-4. `orders/[id]` state-machine PENDING→DELIVERED validated + delivery sync + notify ✓
+## Not performed
 
-### D) Admin (20-NAV)
-- Overview, User/Tailor/Seller Verification, Moderation, Bookings/Orders/Payments/Deliveries/Reviews/Disputes/Analytics/Settings/Audit — all requireRole ADMIN ✓
+- No production/staging database mutation or migration was run; PGlite was an ephemeral in-memory database with synthetic rows.
+- One Paystack test-mode initialization request was attempted with a test-prefixed workspace key; the API returned HTTP 401, no transaction was created, and no verification, webhook, transfer, split, or refund request followed. No live Paystack request was made.
+- No seller bank details or provider destinations were created.
+- No real or test financial transaction has been reconciled.
 
-### E) Cross-cutting
-- **Global Search** `/search` unified tailors/fabrics/designs with state/city/distance pagination — API `/api/search` distance-ranked ✓
-- **Security:** httpOnly sessions 30m/15m idle + 12h/8h max (jwt iat0/lastActive), Paystack HMAC SHA512 + paymentId unique + amount check, image 5MB validated (`/api/uploads` + 5mb bodyLimit), pagination indexes N+1 avoided, RBAC least-privilege, ownership-scoped (customerId=uid, tailorId=profile.id), audit logs ✓
-- **i18n en/ha + light/dark** via AdvancedShells (EN|HA toggle, Sun/Moon) ✓
+## Deployment and UAT gates
 
-## 3) Known gaps for Vercel staging
-- Local DB not running → `/api/search` needs Neon `DATABASE_URL=postgresql://...` — on Vercel it works (`vercel-build` does `prisma db push --accept-data-loss --skip-generate && prisma generate && seed-if-empty`).
-- Emails: `EMAIL_PROVIDER=console` logs to Vercel Logs; set `resend` + `RESEND_API_KEY` + `EMAIL_FROM=noreply@twt.ng` for real sends.
-- Paystack: set `PAYSTACK_SECRET_KEY=sk_live_...` for live HMAC; test uses `sk_test_placeholder` → mock auth url.
+1. Inspect the target database schema and agree on a baseline/deployment procedure. Back up the database and rehearse `prisma/migrations/20261019000000_marketplace_financial_core/migration.sql` against a staging copy. This SQL is a delta from the pre-payment schema, not a fresh-database bootstrap.
+2. Apply the approved schema change before deploying code that expects the new columns. `vercel-build` intentionally no longer runs `prisma db push --accept-data-loss` or auto-seeds production identities.
+3. Configure separate, approved tailoring and fabric commission rules; no rate is selected. Keep settlement routes and seller eligibility disabled until Paystack/business approval and provider destination verification are complete.
+4. Set `PAYMENT_FABRIC_DELIVERY_FEE_MINOR` explicitly. Keep processor-fee policy separate from commission; no default delivery fee or customer surcharge is chosen.
+5. In Paystack test mode, test initialization timeouts and same-reference verification, duplicate/replayed webhooks, amount/currency/customer mismatches, seller settlement, payout approval/unknown states, refund approval/unknown states, and reconciliation. Verify that no uncertain transfer or payment attempt can be retried with a new reference before its status is established.
+6. Conduct role-based customer/tailor/seller/admin UAT, accessibility review, and independent legal, accounting, tax, and operational review before production launch.
 
-## 4) Verdict — READY FOR VERCEL QA
-- Code: green — ship `1238954` (tag v1.0 at c741afa, mannequin removal at 1238954) 
-- Manual QA: run sections B-C on staging with Neon + Resend + Paystack test keys — all flows are wired, no broken links.
-- Next: Vercel auto-deploy → smoke sections A-D live → collect feedback → Phase after UAT: mobile polish.
+The demo seed is for local non-production development only: it requires explicit confirmation, loopback PostgreSQL, and an empty database; it refuses production and never clears existing data. Production identity provisioning must be performed through an approved, audited process.
 
-## How to test now (local)
-- Open preview link → /login → demo accounts:
-  - `customer@demo.twt.ng` / `DemoPass123!`
-  - `tailor@demo.twt.ng` / `DemoPass123!`
-  - `seller@demo.twt.ng` / `DemoPass123!`
-  - `admin@demo.twt.ng` / `DemoPass123!` (seed via `node scripts/create-admin.mjs` then `node scripts/seed-if-empty.mjs`)
-- Or register fresh at `/register/*` — one email = one role.
+See [`PAYSTACK_MARKETPLACE_IMPLEMENTATION.md`](PAYSTACK_MARKETPLACE_IMPLEMENTATION.md) for the implementation details, schema/backfill limits, controls, and production gates.

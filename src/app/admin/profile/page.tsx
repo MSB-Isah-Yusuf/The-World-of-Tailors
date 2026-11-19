@@ -24,7 +24,7 @@ export default async function AdminProfilePage() {
           <div><span className="text-muted-foreground">Email:</span> {user?.email || (session.user as any).email}</div>
           <div><span className="text-muted-foreground">Role:</span> {user?.role || "ADMIN"} • Status {user?.status || "ACTIVE"}</div>
           <div><span className="text-muted-foreground">Phone:</span> {user?.phone || "—"} • Joined {user ? new Date(user.createdAt).toLocaleDateString() : "—"}</div>
-          <div className="text-xs text-muted-foreground pt-2">MSB msb_025@outlook.com is platform owner • Change password via /login → reset • Sessions audited below.</div>
+          <div className="text-xs text-muted-foreground pt-2">Administrator access is personal and should use a unique, protected password. Use the account recovery flow if you need to reset credentials. Recent administrator actions are listed below.</div>
           <div className="pt-2"><LogoutButton variant="outline" size="sm" className="w-full h-8 text-xs border-burgundy/20 text-burgundy" label="Log out — invalidate admin session" redirectTo="/login" /></div>
         </CardContent></Card>
         <Card><CardHeader><CardTitle className="text-sm">My recent admin actions (10)</CardTitle></CardHeader><CardContent className="space-y-1 font-mono text-xs">{myLogs.length ? myLogs.map((l:any)=><div key={l.id}>[{new Date(l.createdAt).toLocaleString()}] {l.action} {l.entity} {l.entityId?.slice(0,8) || ""}</div>) : <div className="text-muted-foreground">No actions yet.</div>}</CardContent></Card>

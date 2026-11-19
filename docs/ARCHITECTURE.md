@@ -1,22 +1,23 @@
-# The World of Tailors Architecture
+# The World of Tailors architecture
+
+Snapshot: 2026-10-19. This describes the current implementation at a high level; it is not a security audit or launch approval.
 
 ## Overview
-Modular monolith — Next.js App Router hosts frontend + API Route Handlers. Business logic executes server-side only. DB via Prisma.
+
+Modular monolith: Next.js App Router provides the UI and API route handlers; business logic and database access run server-side through Prisma.
 
 ## Layers
-- **UI**: Tailwind + shadcn/ui + Framer Motion. Public glassmorphism (homepage location-aware ranking + distanceKm) + solid dashboards (Tailor 15-item midnight, Seller 11-item mirror, Customer 7-item, Admin live). `CartBadge`/`NotificationBell` live polling, `CheckoutClient` multi-seller cart, `AddToCart` per fabric, `MannequinClient` 21 hotspots.
-- **Auth**: NextAuth v5 credentials + PrismaAdapter, JWT sessions, httpOnly cookies, `AUTH_SECRET` required on Vercel. `src/lib/rbac.ts` centralizes `requireAuth/requireRole/assertOwnership/roleHome`.
-- **Data**: Prisma + SQLite (dev) / PostgreSQL (prod) — `prisma db push` on Vercel build + `seed-if-empty.mjs` idempotent (MSB admin). 30+ models, cuid, FK, indexes, history (BookingStatusHistory, InventoryMovement, AuditLog, PaymentWebhookEvent).
-- **Marketplace core**: `Cart` per-user → `CartItem` (productId, qty) → `POST /api/checkout` groups by `sellerId`, atomic `$transaction` (`reserved+=qty`, `InventoryMovement RESERVE`), separate `FabricOrder` per seller, `Delivery` + `Payment PENDING`, `Paystack` webhook `charge.success` HMAC verifies → `Payment PAID`, commits `stock-=qty reserved-=qty`.
-- **Services**: Storage (`src/lib/storage.ts` 5MB/MIME validated), Email (`src/lib/email.ts` console/Resend), Notifications (`src/lib/notifications.ts` + `/api/notifications`), Maps (LocationPicker NG 37 states + Nominatim reverse + OSM), Payments (Paystack `src/lib/paystack.ts`), all env-gated never exposed to browser.
 
-## Security
-- Least-privilege RBAC, ownership-scoped queries, state-transition validation, transactions for inventory/orders, idempotent webhooks.
-- See SECURITY.md.
+- **UI:** Tailwind, shared components, public marketplace pages, and role-specific dashboards. Checkout calls server-owned payment routes; UI state is never payment proof.
+- **Auth:** NextAuth credentials sessions and server-side `requireRole`/ownership checks. Demo login is denied in production even if `DEMO_MODE=true`.
+- **Data:** Current Prisma datasource is PostgreSQL. Models include users, marketplace/catalogue, bookings, orders, inventory history, payments, obligations, attempts, commission snapshots, seller payment profiles, payouts, refunds, disputes, reconciliation, and the financial journal/ledger.
+- **Marketplace:** Inventory reservation occurs in database transactions. Payment obligations and amount snapshots are server-owned. Captures are checked against Paystack and local references, amounts, currency, customer, and obligation before settlement/fulfillment.
+- **Financial controls:** Paystack initialization is idempotent by reference; uncertain calls remain locked to the original reference. The ledger uses idempotency keys and balanced journals; migration SQL adds append-only and balance constraints. Seller provisioning resolves and compares account names before provider destination creation.
 
-## Performance
-- Server rendering for public pages, revalidation, optimized images, pagination, indexes, connection pooling.
-- Background jobs planned via queue (email, thumbnails).
+## Deployment and migration status
 
-## Deployment
-Vercel/Fly with Postgres, managed secrets, `prisma migrate deploy`, monitoring + backups.
+- Vercel builds run `prisma generate && next build`; they do not run schema push or demo/admin seeding.
+- `prisma/migrations/20261019000000_marketplace_financial_core/migration.sql` is a financial delta from the repository's pre-payment schema. This repository does not contain a verified migration baseline, and the target production schema/data have not been inspected. The migration has been executed on a synthetic in-memory PGlite baseline, not on production or a staging copy.
+- Do not run `prisma migrate deploy` or `prisma db push` against a shared/production database until the actual target schema is inspected, a baseline/deployment plan is approved, and a restorable staging-copy rehearsal passes.
+
+See [`PAYSTACK_MARKETPLACE_IMPLEMENTATION.md`](PAYSTACK_MARKETPLACE_IMPLEMENTATION.md), [`SECURITY.md`](SECURITY.md), and [`UAT_SMOKE_REPORT.md`](UAT_SMOKE_REPORT.md) for controls and rollout gates.

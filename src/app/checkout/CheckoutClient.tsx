@@ -76,18 +76,18 @@ export default function CheckoutClient() {
     setPlacing(false);
   };
 
-  const pay = async (reference: string) => {
+  const pay = async (paymentId: string) => {
     setError("");
     try {
-      const res = await fetch("/api/paystack/initialize", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reference }) });
+      const res = await fetch("/api/paystack/initialize", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paymentId }) });
       const j = await res.json();
-      if (!res.ok) throw new Error(j.error || "Paystack init failed");
+      if (!res.ok) throw new Error(j.message ? `${j.error || "PAYMENT_INITIALIZATION_FAILED"}: ${j.message}` : j.error || "Paystack init failed");
       if (j.authorization_url) window.location.href = j.authorization_url;
-      else alert("Paystack mock — in test mode. Webhook will mark PAID. Reference: " + reference + " — Use /api/webhooks/paystack to simulate.");
+      else throw new Error("Paystack did not return a secure checkout URL.");
     } catch (e: any) { setError(e.message); }
   };
 
-  const perSellerFee = cart ? Math.ceil(cart.items.reduce((acc, it) => acc, 0) as any) : 0; // placeholder, actual per seller in API
+  const sellerCount = cart ? new Set(cart.items.map((item) => item.product?.seller?.id).filter(Boolean)).size : 0;
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-8 grid lg:grid-cols-3 gap-6">
@@ -139,20 +139,18 @@ export default function CheckoutClient() {
             {deliveryType === "TO_TAILOR" && <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs">Delivery to tailor requires explicit selection & validation. Seller must confirm. Tailor receives notification, not customer measurements.</div>}
 
             {error && <div className="rounded-xl border border-burgundy/20 bg-burgundy/10 px-3 py-2 text-xs text-burgundy">{error}</div>}
-            {result?.references && (
+            {result?.payments?.length > 0 && (
               <div className="rounded-xl border border-emeraldDeep/20 bg-emerald-50 p-3 text-xs">
-                <div className="font-semibold text-emeraldDeep">✓ Orders created: {result.references.join(", ")}</div>
-                <div className="mt-2 space-y-1">{
-                  result.references.map((ref: string) => (
-                    <div key={ref} className="flex justify-between items-center bg-white rounded-lg px-3 py-2 border"><span>{ref} • PAY-{ref}</span><button onClick={() => pay(`PAY-${ref}`)} className="px-3 py-1 rounded-full bg-midnight text-white text-xs">Pay with Paystack</button></div>
-                  ))}
-                </div>
-                <div className="mt-2 text-muted-foreground">Webhook at <code>/api/webhooks/paystack</code> will verify HMAC SHA512 and mark PAID idempotently. Check <Link href="/dashboard/customer/orders" className="underline">My Orders</Link>.</div>
+                <div className="font-semibold text-emeraldDeep">✓ Orders created: {(result.orderReferences || result.references || []).join(", ")}</div>
+                <div className="mt-2 space-y-1">{result.payments.map((payment: any) => (
+                  <div key={payment.paymentId} className="flex justify-between items-center bg-white rounded-lg px-3 py-2 border"><span>{payment.orderReference} • {payment.paymentReference}</span><button onClick={() => pay(payment.paymentId)} className="px-3 py-1 rounded-full bg-midnight text-white text-xs">Pay with Paystack</button></div>
+                ))}</div>
+                <div className="mt-2 text-muted-foreground">Each seller order has a separate payment record. The return page is not proof of payment; the server verifies the transaction with Paystack. Check <Link href="/dashboard/customer/orders" className="underline">My Orders</Link>.</div>
               </div>
             )}
 
             <Button onClick={placeOrder} disabled={placing || !cart || cart.items.length === 0} className="w-full">{placing ? "Placing orders…" : "Place Order — Reserve Stock Atomically"}</Button>
-            <div className="text-xs text-muted-foreground">Order totals, delivery fees & payment status verified server-side via Paystack webhook idempotency. No card numbers stored. Separate orders per seller shown post-purchase in /dashboard/customer/orders</div>
+            <div className="text-xs text-muted-foreground">Order totals come from server-side prices; payment status changes only after direct Paystack verification. No card numbers are stored. Separate seller orders and tracking appear in /dashboard/customer/orders.</div>
           </CardContent></Card>
       </div>
 
@@ -160,8 +158,9 @@ export default function CheckoutClient() {
         {cart ? <>
           <div className="flex justify-between"><span>Items</span><span>{cart.count}</span></div>
           <div className="flex justify-between"><span>Subtotal</span><span>₦{Number(cart.subtotal).toLocaleString()}</span></div>
-          <div className="flex justify-between"><span>Delivery (est. per seller)</span><span>₦{(deliveryType ? 2500 : 0).toLocaleString()} × sellers</span></div>
-          <div className="flex justify-between font-semibold border-t pt-2"><span>Total est.</span><span>₦{(Number(cart.subtotal) + (cart.count ? 2500 : 0)).toLocaleString()} + fees</span></div>
+          <div className="flex justify-between"><span>Delivery</span><span>Calculated server-side for {sellerCount} seller{sellerCount === 1 ? "" : "s"}</span></div>
+          <div className="flex justify-between font-semibold border-t pt-2"><span>Items subtotal</span><span>₦{Number(cart.subtotal).toLocaleString()}</span></div>
+          <p className="text-[11px] text-muted-foreground">The final delivery amount and checkout total are shown after the server validates current configuration and seller count.</p>
         </> : <div className="text-xs text-muted-foreground">Loading…</div>}
         <div className="text-xs text-muted-foreground">Separate orders per seller created; each has its own Paystack reference <code>PAY-FO-...</code> and delivery tracking.</div>
         <Link href="/dashboard/customer/orders" className="text-xs underline text-plum">View my orders</Link>

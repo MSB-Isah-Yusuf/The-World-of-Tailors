@@ -1,7 +1,7 @@
-# THE WORLD OF TAILORS — MASTER UPGRADE AUDIT
-**Date:** 2026-02-12  •  **Audit scope:** Master Prompt v1 (Admin→Tailor→Seller→Customer)  •  **Codebase tag:** `1a2032d` (69 routes, 39 Prisma models, Next 15.5)  •  **Auditor:** Senior full-stack (architecture/DB/security/perf)
+# THE WORLD OF TAILORS — HISTORICAL MASTER UPGRADE AUDIT
+**Historical snapshot date:** 2026-02-12 • **Scope:** Master Prompt v1 • **Codebase tag at the time:** `1a2032d`
 
-> This is the gate before Phase 1. Every `Placeholder`/`Broken`/`Missing` below becomes a ticket in strict order. No skipping.
+> This is a historical audit of an earlier codebase, not a current audit or launch approval. Its environment, route/model/test counts, security claims, Paystack details, and deployment instructions may be obsolete. In particular, do not follow its former `prisma db push`/Vercel seeding guidance. Use `README.md`, `docs/SECURITY.md`, and `docs/PAYSTACK_MARKETPLACE_IMPLEMENTATION.md` for current constraints.
 
 ### 1. Stack & architecture (verified)
 

@@ -1,8 +1,6 @@
-# The World of Tailors — Implementation Report (Phase 1-9 Complete)
+# Historical TWT Implementation Report (Phase 1-9)
 
-**Production-oriented full-stack marketplace built per Master Prompt. Not a static landing — real DB, auth, RBAC, workflows.**
-
-Live preview: `http://localhost:3000` (dev server running in workspace)
+**This is a historical implementation snapshot, not current UAT, security certification, production-readiness evidence, or a live deployment report.** For current financial-core validation and rollout blockers, see `docs/UAT_SMOKE_REPORT.md` and `docs/PAYSTACK_MARKETPLACE_IMPLEMENTATION.md`.
 
 ---
 
@@ -10,7 +8,7 @@ Live preview: `http://localhost:3000` (dev server running in workspace)
 
 ### Foundation (Phase 1)
 - Next.js 15 App Router + React 19 + TypeScript strict + Tailwind 3 + shadcn/ui + Motion
-- Prisma schema (SQLite dev / Postgres prod) — 25+ models, history tables, inventory movements, payments, deliveries
+- Prisma schema targets PostgreSQL; the current schema includes marketplace, inventory, payment, and delivery models. This historical report does not certify the target database migration baseline.
 - NextAuth v5 credentials + PrismaAdapter, JWT, secure cookies, `src/lib/rbac.ts`
 - Zod + RHF, bcrypt, nanoid, validations for booking/fabric state transitions
 - `.env.example` + `.env` (DEMO_MODE flag), seed script
@@ -79,25 +77,17 @@ Live preview: `http://localhost:3000` (dev server running in workspace)
 
 ---
 
-## 🚀 Run
+## Local development only
 
-```bash
-npm install
-npx prisma db push
-npm run db:seed
-npm run dev       # http://localhost:3000
-npm run build     # production check
-```
+Use the commands in `README.md` with an isolated local PostgreSQL database. `prisma db push` and demo seeding are for disposable local development only; do not point them at a shared or production database. Demo credentials are local-only and must never be deployed.
 
-Demo: `customer@demo.twt.ng` / `tailor@demo.twt.ng` / `seller@demo.twt.ng` / `admin@demo.twt.ng` — `DemoPass123!`
+## Deployment warning
 
-Switch to Postgres: change `prisma/schema.prisma` provider to `postgresql`, set `DATABASE_URL`, run `npx prisma migrate dev`.
-
-Deploy: set `AUTH_SECRET`, `AUTH_URL`, `DEMO_MODE=false`, `APP_ENV=production`, `DATABASE_URL` (Postgres), storage/email/map/paystack keys → `npx prisma migrate deploy`.
+The prior deployment instructions in this historical report are withdrawn. The current financial migration is a delta with no verified repository baseline, and no target production database has been inspected. Do not run `prisma migrate deploy`, `prisma db push`, or a seed against production until the target schema/history are inspected, a baseline/deployment plan is approved, and a restorable staging-copy rehearsal passes. Vercel builds do not mutate schema or seed identities. See `README.md` and `docs/PAYSTACK_MARKETPLACE_IMPLEMENTATION.md` for current gates.
 
 ---
 
 ## 📁 Key Files
 `src/app/page.tsx` (hero+gallery), `src/app/tailors/*`, `src/app/designs/*`, `src/app/fabrics/*`, `src/app/sellers/*`, `src/app/login/page.tsx` (Demo Access), `src/app/register/*`, `src/app/dashboard/*`, `src/app/admin/page.tsx`, `src/lib/auth.ts`, `src/lib/rbac.ts`, `src/lib/validations.ts`, `prisma/schema.prisma`, `prisma/seed.ts`, `docs/*`
 
-**End-to-end verified**: Customer selects design → submits measurements → tailor accepts → fabric ordered → seller dispatches → delivery tracked — dashboards reflect state correctly.
+**Historical claim, not current evidence:** an earlier version reported a full customer-to-delivery workflow check. That check is not reproduced or treated as UAT for the current payment implementation.

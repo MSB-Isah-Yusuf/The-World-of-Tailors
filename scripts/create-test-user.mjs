@@ -1,50 +1,32 @@
 #!/usr/bin/env node
-// Creates a TWT test user directly in Postgres (works locally or against Vercel DB)
-// Usage:
-//   DATABASE_URL="postgres://...@db.prisma.io:5432/postgres?sslmode=require" node scripts/create-test-user.mjs [email] [password] [role]
-//   Roles: CUSTOMER | TAILOR | FABRIC_SELLER | ADMIN
-//   Default: test.user+$(date +%s)@twt.ng / TestPass123! / CUSTOMER
+// Create a throwaway local test account. Refuse production databases and ADMIN role.
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
+const email = String(process.argv[2] || `test.user.${Date.now()}@example.invalid`).trim().toLowerCase();
+const password = String(process.argv[3] || "");
+const role = String(process.argv[4] || "CUSTOMER").toUpperCase();
+const databaseUrl = String(process.env.DATABASE_URL || "");
+
+if (process.env.NODE_ENV === "production") throw new Error("Refusing to create a test account with NODE_ENV=production.");
+if (!databaseUrl) throw new Error("DATABASE_URL is required.");
+if (!/^(localhost|127\.0\.0\.1|::1)(:\d+)?$/.test(new URL(databaseUrl).hostname)) throw new Error("Refusing to create a test user unless DATABASE_URL points to localhost/loopback.");
+if (!["CUSTOMER", "TAILOR", "FABRIC_SELLER"].includes(role)) throw new Error("Role must be CUSTOMER, TAILOR, or FABRIC_SELLER; test-admin creation is prohibited.");
+if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("A valid email address is required.");
+if (password.length < 16 || password.length > 200) throw new Error("Provide a unique test password of 16–200 characters as the second argument.");
+
 const prisma = new PrismaClient();
-
-const email = process.argv[2] || `test.user.${Date.now().toString().slice(-6)}@twt.ng`;
-const password = process.argv[3] || "TestPass123!";
-const role = (process.argv[4] || "CUSTOMER").toUpperCase();
-
-if (!["CUSTOMER","TAILOR","FABRIC_SELLER","ADMIN"].includes(role)) {
-  console.error(`Invalid role ${role}. Use CUSTOMER|TAILOR|FABRIC_SELLER|ADMIN`);
-  process.exit(1);
-}
-if (!process.env.DATABASE_URL) {
-  console.error("DATABASE_URL missing. Copy it from Vercel → Settings → Environment Variables");
-  process.exit(1);
-}
-
-const hash = await bcrypt.hash(password, 10);
-
 try {
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    console.log(`User ${email} already exists (id=${existing.id}, role=${existing.role}) — resetting password/role...`);
-    await prisma.user.update({ where: { email }, data: { passwordHash: hash, role, status: "ACTIVE" }});
-    console.log(`✅ Updated ${email} → ${role} / ${password}`);
-  } else {
-    const u = await prisma.user.create({
-      data: { name: email.split("@")[0], email, passwordHash: hash, role, status: "ACTIVE", phone: "+2348010000000" }
-    });
-    // create role profile if needed
-    if (role === "CUSTOMER") await prisma.customerProfile.create({ data: { userId: u.id }});
-    if (role === "TAILOR") await prisma.tailorProfile.create({ data: { userId: u.id, businessName: `${u.name}'s Atelier`, slug: `test-tailor-${u.id.slice(0,6)}`, city: "Lagos", businessStatus: "APPROVED", isPublished: true }});
-    if (role === "FABRIC_SELLER") await prisma.sellerProfile.create({ data: { userId: u.id, businessName: `${u.name}'s Fabrics`, slug: `test-seller-${u.id.slice(0,6)}`, city: "Lagos", businessStatus: "APPROVED", isPublished: true }});
-    console.log(`✅ Created ${email} → ${role} / ${password} (id=${u.id})`);
-  }
-  console.log(`Login at: https://your-domain.vercel.app/login`);
-} catch (e) {
-  console.error("Failed:", e.message);
-  if (e.code === "P2021") console.error("→ Tables missing. Wait for Vercel deploy fe441fd to finish (prisma db push), then retry.");
-  process.exit(1);
+  if (await prisma.user.findUnique({ where: { email } })) throw new Error("User already exists; no password or role was changed.");
+  const passwordHash = await bcrypt.hash(password, 12);
+  const user = await prisma.$transaction(async (tx) => {
+    const created = await tx.user.create({ data: { name: email.split("@")[0], email, passwordHash, role, status: "ACTIVE" } });
+    if (role === "CUSTOMER") await tx.customerProfile.create({ data: { userId: created.id } });
+    if (role === "TAILOR") await tx.tailorProfile.create({ data: { userId: created.id, businessName: `${created.name}'s Atelier`, slug: `test-tailor-${created.id.slice(0, 8)}`, city: "Lagos", businessStatus: "PENDING", isPublished: false } });
+    if (role === "FABRIC_SELLER") await tx.sellerProfile.create({ data: { userId: created.id, businessName: `${created.name}'s Fabrics`, slug: `test-seller-${created.id.slice(0, 8)}`, city: "Lagos", businessStatus: "PENDING", isPublished: false } });
+    return created;
+  });
+  console.log(`Created local test account ${email} (${role}, id=${user.id}); password was not logged.`);
 } finally {
   await prisma.$disconnect();
 }

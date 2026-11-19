@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import bcrypt from "bcryptjs";
-
 export async function POST(req: NextRequest) {
-  if (process.env.DEMO_MODE === "false") return NextResponse.json({ error: "Demo disabled" }, { status: 403 });
+  if (process.env.NODE_ENV === "production" || process.env.DEMO_MODE !== "true") return NextResponse.json({ error: "Demo disabled" }, { status: 403 });
   const form = await req.formData();
   const email = String(form.get("email")||"").toLowerCase();
   const allowed = ["customer@demo.twt.ng","tailor@demo.twt.ng","seller@demo.twt.ng","admin@demo.twt.ng"];

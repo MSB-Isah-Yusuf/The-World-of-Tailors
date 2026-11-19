@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/rbac";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
+import { AdminPaymentDisputes } from "@/components/payments/AdminPaymentDisputes";
 
 async function resolveDispute(formData: FormData) {
   "use server";
@@ -24,7 +25,8 @@ export default async function DisputesPage() {
     <div className="p-6">
       <div className="mx-auto max-w-6xl space-y-6">
         <div className="flex justify-between"><div><h1 className="font-display text-2xl">Disputes & Complaints</h1><p className="text-sm text-muted-foreground">Investigate • Record decisions • Notify parties • Auditable history</p></div><Link href="/admin" className="text-sm underline">← Admin</Link></div>
-        <Card><CardHeader><CardTitle className="text-sm">Open disputes (hidden/reported reviews proxy) • {flagged.length}</CardTitle></CardHeader>
+        <Card><CardHeader><CardTitle className="text-sm">Payment disputes • customer-reported verified payments</CardTitle></CardHeader><CardContent><AdminPaymentDisputes /></CardContent></Card>
+        <Card><CardHeader><CardTitle className="text-sm">Reported reviews • {flagged.length}</CardTitle></CardHeader>
           <CardContent className="space-y-2">
             {flagged.length===0 ? <div className="text-sm text-muted-foreground p-6 text-center border rounded-xl bg-white">No open disputes — reported content appears here. Resolve records decision + audit.</div> :
             flagged.map((r:any)=><div key={r.id} className="border rounded-xl p-3 bg-white">
@@ -32,7 +34,7 @@ export default async function DisputesPage() {
               <div className="text-xs mt-1">{r.comment?.slice(0,160)||"—"}</div>
               <form action={resolveDispute} className="flex gap-2 mt-3"><input type="hidden" name="id" value={r.id}/><input name="decision" placeholder="Decision / reason" className="flex-1 h-8 rounded-full border px-3 text-xs bg-white"/><Button size="sm" className="h-8 text-xs">Resolve & notify</Button></form>
             </div>)}
-            <div className="text-xs text-muted-foreground">Dispute workflow: view booking/order reference → investigate → decision → notify buyer + seller/tailor → audit ADMIN_RESOLVE_DISPUTE. Full complaint model next.</div>
+            <div className="text-xs text-muted-foreground">Reported review moderation remains separate from the payment-dispute queue above.</div>
           </CardContent></Card>
       </div>
     </div>

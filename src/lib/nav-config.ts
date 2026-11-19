@@ -42,6 +42,8 @@ export const CUSTOMER_GROUPS: NavGroup[] = [
     children: [
       { href: "/dashboard/customer/addresses", labelKey: "addresses", icon: MapPin },
       { href: "/dashboard/customer/notifications", labelKey: "notifications", icon: Bell },
+      { href: "/dashboard/customer/refunds", labelKey: "payments", icon: Wallet },
+      { href: "/dashboard/customer/disputes", labelKey: "disputes", icon: Flag },
       { href: "/dashboard/customer/account", labelKey: "accountSettings", icon: Settings },
       { href: "/dashboard/customer/privacy", labelKey: "privacySecurity", icon: Lock },
     ]
@@ -171,6 +173,12 @@ export const ADMIN_GROUPS: NavGroup[] = [
       { href: "/admin/bookings", labelKey: "bookings", icon: ClipboardList },
       { href: "/admin/orders", labelKey: "fabricOrders", icon: ShoppingBag },
       { href: "/admin/payments", labelKey: "payments", icon: Wallet },
+      { href: "/admin/finance", labelKey: "payments", icon: BarChart3 },
+      { href: "/admin/finance/commission-rules", labelKey: "payments", icon: FileText },
+      { href: "/admin/finance/seller-profiles", labelKey: "sellerManagement", icon: Building2 },
+      { href: "/admin/finance/payouts", labelKey: "payments", icon: Wallet },
+      { href: "/admin/finance/refunds", labelKey: "payments", icon: Wallet },
+      { href: "/admin/finance/reconciliation", labelKey: "payments", icon: BarChart3 },
       { href: "/admin/deliveries", labelKey: "deliveries", icon: Truck },
     ]
   },

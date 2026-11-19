@@ -1,36 +1,32 @@
-# Security Notes
+# Security notes
 
-## Auth
-- Central login `/login` only. Public registration never creates ADMIN — `/register/*` only allows CUSTOMER/TAILOR/FABRIC_SELLER; ADMIN via `scripts/create-admin.mjs` or `prisma/seed.ts` only. Enforced server-side in Prisma `role` default + RLS checks.
-- Passwords bcrypt10 hashed. MSB admin `msb_025@outlook.com` created idempotently via `scripts/seed-if-enable.mjs` on Vercel build.
-- NextAuth v5 JWT, `AUTH_SECRET` required on Vercel (see DEPLOYMENT.md), httpOnly Secure SameSite, trustHost true, session revocation on `SUSPENDED` + `Session.deleteMany` on admin suspend.
-- No client role selector; server derives dashboard from DB via `requireRole` + `auth()` in every server page/API.
-- Rate limiting: `middleware.ts` + `src/lib/rate-limit.ts` 30/min per IP on `/api/auth`, `/api/demo-login`, `/api/webhooks` → 429; extend to Upstash Redis for multi-replica prod if needed.
+Snapshot: 2026-10-19. This is an implementation note, not a full security audit or a compliance claim.
 
-## RBAC (tested)
-- Customers cannot access other customers' measurements.
-- Tailors cannot access other tailors' bookings — ownership-scoped queries.
-- Sellers cannot access measurements; cannot edit other sellers' products.
-- Sellers cannot change tailoring status; tailors cannot change inventory.
-- Non-admins cannot assign admin roles; unapproved businesses restricted.
+## Identity and authorization
 
-## Data protection
-- Measurements/addresses private, never in public API/URLs/emails. Redacted from logs. HTTPS + encryption at rest.
-- Image uploads: signature, size, dimension limits, randomized storage keys, thumbnails, orphan cleanup.
+- Public registration creates CUSTOMER, TAILOR, or FABRIC_SELLER accounts only. Financial APIs enforce role checks and ownership checks server-side; client-supplied role/amount data is not authorization.
+- `scripts/create-admin.mjs` now requires explicit environment-provided identity/password plus a confirmation flag. It creates a new admin only; it never promotes an existing account or resets an existing password. `prisma/seed.ts` and `scripts/seed-if-empty.mjs` are local demo helpers: they require explicit confirmation, loopback PostgreSQL, an empty database, and refuse production execution. They never clear existing data. Demo login endpoints also hard-disable in production, and the demo seed marks all sample payments PENDING rather than fabricating captures.
+- Vercel builds no longer auto-sync schema with `prisma db push --accept-data-loss` and do not create production identities. Apply the reviewed database migration separately, after backup and staging rehearsal.
+- Do not treat this note as evidence that every legacy application route has been re-audited. Production deployment still needs independent RBAC, session, infrastructure, and operational review.
 
-## Payments
-- Browser redirect not trusted. Paystack `x-paystack-signature` HMAC SHA512 verified (`src/lib/paystack.ts:verifyPaystackSignature`) — 401 on bad signature. Amount re-checked against Payment.amount. Only webhook can mark `PAID` → commits inventory (`stock-=qty reserved-=qty`).
-- Webhook idempotency: `PaymentWebhookEvent.eventId unique + processed` — duplicate event ACK immediately, `Unique constraint` race handled.
+## Paystack safeguards
 
-## Headers & web
-- `middleware.ts` sets `X-Frame-Options DENY`, `X-Content-Type-Options nosniff`, `Referrer-Policy`, `Permissions-Policy`, `HSTS` on prod, minimal `CSP` (self + Paystack/Mapbox/Unsplash).
-- `sitemap.xml`, `robots.txt`, `manifest.webmanifest` present; public pages SSR + pagination; images validated (MIME/size 5MB) via `src/lib/storage.ts`.
+- Amounts and obligations are server-owned, integer kobo. Payment initialization rejects client-provided amounts. Checkout does not mark an order paid from a browser redirect.
+- Webhooks validate the exact raw request body using the timestamped Paystack signing-secret signature (and the legacy API-key signature only during migration), then independently verify transactions with Paystack before settlement.
+- Captures are matched to the local attempt, amount, currency, customer, reference, metadata, and obligation. Mismatches/uncertain state changes go to review and do not fulfil inventory or bookings.
+- An uncertain initialization stays locked to its original reference. Admin verification queries that same reference; the application does not automatically issue a replacement attempt.
+- Payouts/refunds require controlled approval and provider verification; uncertain transfers/refunds are checked with the original reference, never resent using a new reference.
+- Seller bank/provider profiles are role-protected and payout/settlement eligibility remains disabled until verified and explicitly approved.
 
-## Data protection additions
-- Checkout `TO_TAILOR` requires validated `tailorDestinationId` (APPROVED tailor) — server-checked in `/api/checkout`.
-- Cart `available = stock - reserved` enforced on every add/update; overselling impossible via `$transaction` reserve.
+## Financial ledger
 
-## Env
-- Separate dev/prod, managed secrets, `.env.example` only placeholders. No private env exposed to browser.
+- Application code posts idempotent balanced double-entry journals; it contains no journal/entry update or delete path.
+- The PostgreSQL migration adds amount/currency constraints and append-only/balance triggers. These database guarantees are **not active** until the reviewed migration has actually been applied to the target database.
+- Ledger balances are internal accounting records, not claims that provider funds are segregated, escrowed, available, or settled. Provider reconciliation remains necessary, especially for Paystack split allocations.
 
-Run `tests/authz.test.ts` for authorization test suite.
+## Outstanding checks
+
+- PostgreSQL migration rehearsal and production schema-baseline review have not been run.
+- No Paystack test/live transaction, transfer, webhook, or refund was run.
+- The current automated tests are unit/API-guard tests, not a substitute for DB concurrency, integration, penetration, privacy, or external compliance review.
+- Dependency vulnerability review: `npm audit` reports zero findings after dependency updates and targeted transitive overrides (`deepmerge-ts` under Prisma config and PostCSS under Next). The clean install, Prisma validation, typecheck, automated tests, and production build all pass. Recheck these overrides on each upstream Prisma/Next upgrade and remove once their bundled dependency versions are patched.

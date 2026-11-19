@@ -1,48 +1,47 @@
 #!/usr/bin/env node
-// Creates/updates admin user MSB (msb_025@outlook.com) — safe to re-run (upsert)
-// Usage (local with prod DB):
-//   DATABASE_URL="postgresql://..." node scripts/create-admin.mjs
-// Or on Vercel (one-off):
-//   vercel env pull .env.local && DATABASE_URL=$(grep DATABASE_URL .env.local | cut -d= ./node_modules/.bin/tsx scripts/create-admin.mjs
+// One-time, explicitly confirmed administrator bootstrap. Never use default credentials,
+// promote an existing account, or reset an existing administrator's password.
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
-const ADMIN_EMAIL = "msb_025@outlook.com";
-const ADMIN_NAME = "Muhammad Sani Baffa";
-const ADMIN_PASSWORD = "_MSB_AdmiNTWT@026"; // MSB — change after first login via /admin or profile
-
 async function main() {
-  if (!process.env.DATABASE_URL) {
-    console.error("DATABASE_URL missing. Get it from Vercel Dashboard → Project → Settings → Environment Variables → DATABASE_URL, then run:");
-    console.error('  DATABASE_URL="postgresql://user:password@host:5432/db?sslmode=require" node scripts/create-admin.mjs');
-    process.exit(1);
-  }
-  const hash = await bcrypt.hash(ADMIN_PASSWORD, 10);
-  const email = ADMIN_EMAIL.toLowerCase();
+  const email = String(process.env.ADMIN_BOOTSTRAP_EMAIL || "").trim().toLowerCase();
+  const password = String(process.env.ADMIN_BOOTSTRAP_PASSWORD || "");
+  const name = String(process.env.ADMIN_BOOTSTRAP_NAME || "Marketplace Administrator").trim().slice(0, 120);
 
-  let user = await prisma.user.findUnique({ where: { email } });
-  if (user) {
-    user = await prisma.user.update({
-      where: { email },
-      data: { name: ADMIN_NAME, passwordHash: hash, role: "ADMIN", status: "ACTIVE" },
-    });
-    console.log(`✓ Updated existing user ${email} → ADMIN (id=${user.id})`);
-  } else {
-    user = await prisma.user.create({
-      data: { name: ADMIN_NAME, email, passwordHash: hash, role: "ADMIN", status: "ACTIVE" },
-    });
-    console.log(`✓ Created admin ${email} → ADMIN (id=${user.id})`);
+  if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL must be configured for the approved bootstrap operation.");
+  if (process.env.ADMIN_BOOTSTRAP_CONFIRM !== "CREATE_NEW_ADMIN") throw new Error("Set ADMIN_BOOTSTRAP_CONFIRM=CREATE_NEW_ADMIN to explicitly authorize a new administrator bootstrap.");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("ADMIN_BOOTSTRAP_EMAIL must be a valid email address.");
+  if (password.length < 20 || password.length > 200) throw new Error("ADMIN_BOOTSTRAP_PASSWORD must be 20–200 characters; use a unique secret manager value.");
+
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    if (existing.role === "ADMIN") {
+      console.log("An administrator with this email already exists; no password, role, or status was changed.");
+      return;
+    }
+    throw new Error("An account with this email already exists without ADMIN role. Resolve identity and authorization manually; no promotion was performed.");
   }
 
-  // Ensure admin can access /admin verification (no extra profile needed)
-  await prisma.auditLog.create({
-    data: { userId: user.id, action: "UPSERT_ADMIN", entity: "User", entityId: user.id, metadata: { email, name: ADMIN_NAME, by: "scripts/create-admin.mjs" } },
-  }).catch(()=>{});
-
-  console.log(`Login at /login with ${email} / (your password) → redirects to /admin`);
-  console.log("SECURITY: Change password after first login, and rotate AUTH_SECRET if you committed it.");
+  const passwordHash = await bcrypt.hash(password, 12);
+  const user = await prisma.$transaction(async (tx) => {
+    const created = await tx.user.create({ data: { name: name || "Marketplace Administrator", email, passwordHash, role: "ADMIN", status: "ACTIVE" } });
+    await tx.auditLog.create({ data: {
+      action: "ADMIN_BOOTSTRAPPED",
+      entity: "User",
+      entityId: created.id,
+      metadata: { provisioningMethod: "explicit_environment_bootstrap" },
+    } });
+    return created;
+  });
+  console.log(`Created administrator ${email} (id=${user.id}). The supplied password was not logged.`);
 }
 
-main().catch(e=>{ console.error("Admin creation failed:", e.code||"", e.message); if(String(e.message||"").includes("Can't reach database")) console.error("→ DATABASE_URL unreachable — use production DATABASE_URL from Vercel, not localhost"); process.exit(1); }).finally(()=> prisma.$disconnect());
+main()
+  .catch((error) => {
+    console.error("Administrator bootstrap failed:", error instanceof Error ? error.message : "unknown error");
+    process.exitCode = 1;
+  })
+  .finally(async () => { await prisma.$disconnect(); });

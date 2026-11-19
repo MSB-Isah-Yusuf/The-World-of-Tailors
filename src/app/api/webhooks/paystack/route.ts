@@ -1,128 +1,118 @@
+import crypto from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyPaystackSignature } from "@/lib/paystack";
+import { PaymentConfigurationError, getPaymentRuntimeConfig } from "@/lib/payments/config";
+import { verifyPaystackWebhookSignature, verifyPaystackTransaction, verifyPaystackTransfer } from "@/lib/paystack";
+import { verifyAndSettlePayment } from "@/lib/payments/verify-and-settle";
+import { applyVerifiedPaystackTransfer } from "@/lib/payments/paystack-transfers";
 
-export async function POST(req: NextRequest) {
-  const rawBody = await req.text();
-  const signature = req.headers.get("x-paystack-signature");
+export const runtime = "nodejs";
 
-  // Verify HMAC — skip if no PAYSTACK_SECRET_KEY (dev/mock)
-  if (process.env.PAYSTACK_SECRET_KEY) {
-    const ok = verifyPaystackSignature(rawBody, signature);
-    if (!ok) return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-  }
-
-  let event: any;
-  try { event = JSON.parse(rawBody); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
-
-  // Paystack event id is in data.id or event.id — ensure uniqueness
-  const eventId = String(event.data?.id || event.id || event.data?.reference || `evt_${Date.now()}_${Math.random().toString(36).slice(2,8)}`);
-  const provider = "paystack";
-
-  // Idempotency — if we already processed this eventId, ACK immediately
-  try {
-    const existing = await prisma.paymentWebhookEvent.findUnique({ where: { eventId } });
-    if (existing?.processed) return NextResponse.json({ ok: true, duplicate: true });
-    if (!existing) await prisma.paymentWebhookEvent.create({ data: { provider, eventId, payload: event, processed: false } });
-  } catch (e: any) {
-    // unique constraint race — another webhook is processing
-    if (String(e.message).includes("Unique constraint")) return NextResponse.json({ ok: true, duplicate: true });
-    console.warn("[webhook] event store failed", e.message);
-  }
-
-  const type = event.event || event.type; // e.g., charge.success
-  const data = event.data || event;
-  const reference: string | undefined = data.reference || data.paystack_reference;
-
-  if (type === "charge.success" && reference) {
-    // Normalize reference: PAY-FO-... or FO-... or booking ref
-    const amountKobo = Number(data.amount || 0);
-    const paidAt = data.paid_at || data.paidAt || new Date().toISOString();
-
-    try {
-      // Find Payment by reference (supports both PAY-FO-xxx and FO-xxx)
-      let payment: any = await prisma.payment.findUnique({ where: { reference } });
-      if (!payment && reference.startsWith("PAY-")) {
-        const alt = reference.replace(/^PAY-/, "");
-        // retry by fabricOrder reference
-        const order: any = await prisma.fabricOrder.findUnique({ where: { reference: alt } });
-        if (order) payment = await prisma.payment.findFirst({ where: { fabricOrderId: order.id } });
-      }
-      if (!payment) {
-        // FabricOrder direct reference search
-        const order: any = await prisma.fabricOrder.findUnique({ where: { reference } });
-        if (order) payment = await prisma.payment.findFirst({ where: { fabricOrderId: order.id } });
-      }
-      // Booking payment path
-      if (!payment && (reference.startsWith("SC-") || reference.startsWith("PAY-SC-"))) {
-        const bookingRef = reference.replace(/^PAY-/, "");
-        const booking: any = await prisma.tailoringBooking.findUnique({ where: { reference: bookingRef } });
-        if (booking) payment = await prisma.payment.findFirst({ where: { bookingId: booking.id } });
-      }
-
-      if (!payment) {
-        console.warn(`[webhook] payment not found for ${reference}, event ${eventId}`);
-        await prisma.paymentWebhookEvent.update({ where: { eventId }, data: { processed: true } }).catch(() => {});
-        return NextResponse.json({ ok: true, warning: "payment not found, ACK to prevent retry storm" });
-      }
-
-      // Verify amount matches (prevent tampering) — allow small rounding
-      const expectedKobo = Math.round(Number(payment.amount) * 100);
-      if (amountKobo && Math.abs(amountKobo - expectedKobo) > 100) {
-        console.warn(`[webhook] amount mismatch ${reference}: expected ${expectedKobo} got ${amountKobo}`);
-      }
-
-      // Idempotent status update — only transition PENDING → PAID
-      if (payment.status !== "PAID") {
-        await prisma.$transaction(async (tx) => {
-          await tx.payment.update({ where: { id: payment.id }, data: { status: "PAID", providerRef: String(data.id || reference) } });
-
-          if (payment.fabricOrderId) {
-            const order: any = await tx.fabricOrder.findUnique({ where: { id: payment.fabricOrderId } });
-            if (order) {
-              // Commit inventory: stock -= quantity, reserved -= quantity (sale finalized)
-              const items: any[] = await tx.fabricOrderItem.findMany({ where: { orderId: order.id } });
-              for (const it of items) {
-                await tx.fabricProduct.update({ where: { id: it.productId }, data: { stock: { decrement: it.quantity }, reserved: { decrement: it.quantity } } });
-                await tx.inventoryMovement.create({ data: { productId: it.productId, delta: -it.quantity, reason: `SOLD via Paystack ${reference}` } });
-              }
-              await tx.fabricOrder.update({ where: { id: order.id }, data: { paymentStatus: "PAID", status: "CONFIRMED" } });
-              await tx.delivery.updateMany({ where: { fabricOrderId: order.id }, data: { status: "CONFIRMED" } });
-              // notify customer + seller
-              await tx.notification.create({ data: { userId: order.customerId, title: "Payment confirmed", message: `Order ${order.reference} paid via Paystack ✓ — seller will prepare shipment`, type: "payment", link: "/dashboard/customer/orders" } });
-              const seller: any = await tx.sellerProfile.findUnique({ where: { id: order.sellerId } });
-              if (seller?.userId) await tx.notification.create({ data: { userId: seller.userId, title: "Order paid — prepare shipment", message: `${order.reference} is now CONFIRMED. Prepare for dispatch.`, type: "payment", link: "/dashboard/seller/orders" } });
-            }
-          }
-
-          if (payment.bookingId) {
-            const booking: any = await tx.tailoringBooking.findUnique({ where: { id: payment.bookingId } });
-            if (booking) {
-              await tx.tailoringBooking.update({ where: { id: booking.id }, data: { paymentStatus: "PAID" } });
-              await tx.auditLog.create({ data: { action: "BOOKING_PAID_VIA_PAYSTACK", entity: "TailoringBooking", entityId: booking.id, metadata: { reference, eventId, paidAt } } });
-            }
-          }
-        });
-      }
-
-      await prisma.paymentWebhookEvent.update({ where: { eventId }, data: { processed: true } }).catch(() => {});
-      return NextResponse.json({ ok: true });
-    } catch (e: any) {
-      console.error("[webhook][charge.success] tx failed", e);
-      return NextResponse.json({ error: e.message }, { status: 500 });
-    }
-  }
-
-  if (type === "charge.failed" || type === "charge.dispute" || event.event?.includes("failed")) {
-    await prisma.paymentWebhookEvent.update({ where: { eventId }, data: { processed: true } }).catch(() => {});
-    return NextResponse.json({ ok: true, noted: type });
-  }
-
-  // Unknown event — ACK but mark processed to avoid Paystack retries
-  await prisma.paymentWebhookEvent.update({ where: { eventId }, data: { processed: true } }).catch(() => {});
-  return NextResponse.json({ ok: true, unhandled: type });
+function text(value: unknown): string | null {
+  return value == null ? null : String(value).slice(0, 180);
 }
 
-export async function GET() {
-  return NextResponse.json({ ok: true, endpoint: "/api/webhooks/paystack", method: "POST", verify: "x-paystack-signature HMAC SHA512" });
+function safePayload(eventType: string, data: any) {
+  // Explicit allowlist: raw webhook payloads can contain customer and recipient details.
+  return {
+    event: eventType,
+    data: {
+      id: text(data?.id),
+      reference: text(data?.reference),
+      status: text(data?.status),
+      amount: Number.isSafeInteger(data?.amount) ? String(data.amount) : null,
+      currency: text(data?.currency),
+      fees: Number.isSafeInteger(data?.fees) ? String(data.fees) : null,
+      paid_at: text(data?.paid_at),
+      transfer_code: text(data?.transfer_code),
+      refund_reference: text(data?.refund_reference || data?.reference),
+    },
+  };
+}
+
+async function storeEvent({ eventId, eventType, reference, payloadHash, payload }: {
+  eventId: string; eventType: string; reference: string | null; payloadHash: string; payload: any;
+}) {
+  try {
+    return await prisma.paymentWebhookEvent.create({ data: {
+      provider: "paystack", eventId, eventType, transactionReference: reference,
+      payloadHash, signatureVerified: true, processingStatus: "RECEIVED", payload,
+    } });
+  } catch (error: any) {
+    if (error?.code !== "P2002") throw error;
+    return prisma.paymentWebhookEvent.findUnique({ where: { eventId } });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  const rawBody = Buffer.from(await req.arrayBuffer());
+  let config;
+  try { config = getPaymentRuntimeConfig(); }
+  catch (error) {
+    const message = error instanceof PaymentConfigurationError ? error.message : "Payment configuration unavailable";
+    return NextResponse.json({ error: "PAYMENT_CONFIGURATION_UNAVAILABLE", message }, { status: 503 });
+  }
+
+  const signature = verifyPaystackWebhookSignature({
+    rawBody,
+    currentSignature: req.headers.get("paystack-signature"),
+    legacySignature: req.headers.get("x-paystack-signature"),
+    signingSecret: config.webhookSigningSecret,
+    apiSecret: config.secretKey,
+  });
+  if (!signature.valid) return NextResponse.json({ error: "INVALID_WEBHOOK_SIGNATURE" }, { status: 401 });
+
+  let event: any;
+  try { event = JSON.parse(rawBody.toString("utf8")); }
+  catch { return NextResponse.json({ error: "INVALID_JSON" }, { status: 400 }); }
+  const eventType = String(event?.event || event?.type || "").slice(0, 80);
+  const data = event?.data || {};
+  const reference = text(data.reference);
+  if (!eventType) return NextResponse.json({ error: "MISSING_EVENT_TYPE" }, { status: 400 });
+
+  const payloadHash = crypto.createHash("sha256").update(rawBody).digest("hex");
+  const stableKey = [eventType, text(data.id) || "no-id", reference || "no-reference"].join("|");
+  const eventId = crypto.createHash("sha256").update(stableKey).digest("hex");
+  const eventRow: any = await storeEvent({ eventId, eventType, reference, payloadHash, payload: safePayload(eventType, data) }).catch(() => null);
+  if (!eventRow) return NextResponse.json({ error: "WEBHOOK_EVENT_STORE_FAILED" }, { status: 500 });
+  if (["PROCESSED", "IGNORED", "REVIEW_REQUIRED", "LEGACY_PROCESSED"].includes(eventRow.processingStatus)) return NextResponse.json({ ok: true, duplicate: true });
+
+  try {
+    if (eventType === "charge.success" && reference) {
+      const attempt = await prisma.paymentAttempt.findUnique({ where: { providerReference: reference }, select: { id: true } });
+      if (!attempt) {
+        await prisma.paymentWebhookEvent.update({ where: { eventId }, data: { processingStatus: "REVIEW_REQUIRED", errorSummary: "PAYMENT_ATTEMPT_NOT_FOUND" } });
+        await prisma.auditLog.create({ data: { action: "PAYSTACK_UNMATCHED_CHARGE", entity: "PaymentWebhookEvent", entityId: eventRow.id, metadata: { eventId, reference } } }).catch(() => {});
+        return NextResponse.json({ ok: true, review: true });
+      }
+      const providerData = await verifyPaystackTransaction(reference);
+      const settled = await verifyAndSettlePayment(providerData, "webhook");
+      if (!settled.ok) {
+        const final = !settled.retryable;
+        await prisma.paymentWebhookEvent.update({ where: { eventId }, data: { processingStatus: final ? "REVIEW_REQUIRED" : "RETRYABLE", errorSummary: settled.code } });
+        if (!final) return NextResponse.json({ error: "PAYMENT_VERIFICATION_RETRY", code: settled.code }, { status: 500 });
+        await prisma.auditLog.create({ data: { action: "PAYSTACK_CHARGE_REQUIRES_REVIEW", entity: "PaymentWebhookEvent", entityId: eventRow.id, metadata: { eventId, reference, code: settled.code } } }).catch(() => {});
+        return NextResponse.json({ ok: true, review: true });
+      }
+      await prisma.paymentWebhookEvent.update({ where: { eventId }, data: { processed: true, processingStatus: settled.duplicateCapture ? "REVIEW_REQUIRED" : "PROCESSED", processedAt: new Date(), errorSummary: settled.duplicateCapture ? "DUPLICATE_CAPTURE" : null } });
+      return NextResponse.json({ ok: true, status: settled.status, duplicateCapture: !!settled.duplicateCapture });
+    }
+
+    if (["transfer.success", "transfer.failed", "transfer.reversed"].includes(eventType) && reference) {
+      const providerTransfer = await verifyPaystackTransfer(reference);
+      const result = await applyVerifiedPaystackTransfer(reference, providerTransfer, eventId);
+      await prisma.paymentWebhookEvent.update({ where: { eventId }, data: { processed: result.final, processingStatus: result.status, errorSummary: result.error || null, processedAt: result.final ? new Date() : null } });
+      if (!result.final) return NextResponse.json({ error: "TRANSFER_VERIFICATION_RETRY", status: result.status }, { status: 500 });
+      return NextResponse.json({ ok: true, status: result.status });
+    }
+
+    // Paystack currently documents charge.success as the charge completion webhook. Failed/pending
+    // payment attempts are resolved through the authenticated verification endpoint instead.
+    await prisma.paymentWebhookEvent.update({ where: { eventId }, data: { processed: true, processingStatus: "IGNORED", processedAt: new Date() } });
+    return NextResponse.json({ ok: true, ignored: eventType });
+  } catch (error: any) {
+    await prisma.paymentWebhookEvent.update({ where: { eventId }, data: { processingStatus: "RETRYABLE", errorSummary: "PROVIDER_OR_DATABASE_RETRY" } }).catch(() => {});
+    console.error("[paystack-webhook] processing failure", String(error?.name || "Error"));
+    return NextResponse.json({ error: "WEBHOOK_PROCESSING_RETRY" }, { status: 500 });
+  }
 }

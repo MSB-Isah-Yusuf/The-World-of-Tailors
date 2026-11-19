@@ -228,7 +228,7 @@ Build fixed:
 
 ## Known Gaps / Next Operator Action
 
-- **Push failed:** `git push origin main` remote Invalid username or token — PAT ghp_gP03... expired/revoked. Bundle saved at /tmp/twt-65887ee.bundle (2.0M) and workspace commit 65887ee is local. Operator must add fresh PAT with repo scope and `git push origin main` or `git push https://<newPAT>@github.com/MSB-Isah-Yusuf/The-World-of-Tailors.git main`. Vercel webhook will deploy on push. Verify health after: `curl https://my-tailors.vercel.app/api/health`.
+- **GitHub credential safety:** An earlier push attempt failed after its credential expired/revoked. Authenticate with the approved Git credential helper; never store a PAT in this report, shell history, or a remote URL.
 - **Design image orphan cleanup:** Hard delete cascades Prisma `designImage` where designId but local /uploads files not unlinked on Vercel ephemeral — no leak in cloud. For S3, implement deleteObject on design.imageUrls in deleteDesign (add after delete).
 - **Rate limiting:** Add explicit 10/min per IP on /api/profile/avatar via Upstash or in-memory LRU next iteration.
 - **Measurement DB nullable migration formal:** If future adds per-column measurement fields, generate `npx prisma migrate dev --name make_measurements_nullable`. Currently JSON so no-op.

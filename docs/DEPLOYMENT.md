@@ -1,59 +1,37 @@
-# Deployment — The World of Tailors (TWT)
+# Deployment controls — The World of Tailors
 
-## Vercel Environment Variables (Required)
-Add in **Vercel → Project → Settings → Environment Variables** (Production + Preview + Development):
+**Deployment is currently gated.** The financial-core schema delta has not been applied to a target database, the production database baseline is unverified, and Paystack test/live integration has not been exercised. Do not treat this file as approval to release.
 
-```
-DATABASE_URL="postgresql://user:pass@host:5432/db?sslmode=require"
-AUTH_SECRET="openssl rand -base64 32  (32+ chars, e.g. k9vM3pLx...)"
-AUTH_URL="https://your-domain.vercel.app"
-APP_ENV="production"
-DEMO_MODE="false"
-STORAGE_PROVIDER="local" or "s3"
-NEXT_PUBLIC_MAPBOX_TOKEN=""
-PAYSTACK_SECRET_KEY=""
-PAYSTACK_PUBLIC_KEY=""
-NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=""
-RESEND_API_KEY=""
-EMAIL_FROM="noreply@twt.ng"
-```
+## Environment configuration
 
-**Fix for `MissingSecret` error:**
-```
-[auth][error] MissingSecret: Please define a `secret`
-```
-→ Cause: `AUTH_SECRET` not set on Vercel (local .env has it, but Vercel env is separate).
-→ Fix: Add `AUTH_SECRET` as above, then **Redeploy**.
+Configure secrets in the hosting provider's secret manager; do not commit them or paste them into chat.
 
-Generate:
-```bash
-openssl rand -base64 32
-# or
-npx auth secret  # prints AUTH_SECRET line
-```
+- PostgreSQL `DATABASE_URL` for the exact target environment.
+- A newly generated, unique `AUTH_SECRET` and the correct `AUTH_URL`.
+- `NODE_ENV=production` and `DEMO_MODE=false`; production demo access is disabled in code even if the flag is mis-set.
+- Storage/email/maps settings as required by the deployment.
+- Use Paystack **test** keys only for approved integration testing. `PAYMENT_TEST_MODE_ENABLED` must remain false in production unless this is an approved test-only staging deployment using `sk_test_`/`pk_test_` credentials. Configure the webhook signing secret separately.
+- Keep `PAYMENT_FINANCIAL_FOUNDATION_APPROVED=false`, `PAYMENT_LIVE_ENABLED=false`, and `PAYMENT_LIVE_APPROVED=false`. Live provider mutations require all three flags, production mode, and matching live keys. The foundation flag must not be set until the financial database, ledger, commission engine, and Paystack test-mode integration have been accepted; the other flags require separate documented business approval. Do not enable live traffic until migration, provider verification, and operational controls are signed off.
+- Leave `PAYMENT_IMMEDIATE_SPLIT_ENABLED=false`, `PAYMENT_CONTROLLED_PAYOUTS_APPROVED=false`, and `PAYMENT_CONTROLLED_PAYOUTS_ENABLED=false` until the applicable Paystack/business approvals are documented. Set fabric delivery fee and commission rules explicitly before offering checkout.
+
+See `.env.example` for variable names and safe defaults. Generate a unique auth secret with `openssl rand -base64 32`; never copy a sample key.
 
 ## Build
-Vercel runs:
-```
-npm install
-npx prisma generate   # via postinstall
-npm run build         # next build (prerenders 40 routes)
-```
 
-Ensure `prisma/schema.prisma` provider is `postgresql` for production (dev uses `sqlite` file:./dev.db).
+Vercel runs `prisma generate && next build`. The build does not connect to the database to mutate schema and does not seed demo or administrator accounts.
 
-## Database
-```
-npx prisma migrate deploy
-npm run db:seed   # creates demo accounts: admin@demo.twt.ng etc.
-```
+## Database rollout gate
 
-## Auth
-- One central login `/login` with Demo Access (gated by DEMO_MODE)
-- JWT + httpOnly Secure SameSite cookies, suspension revocation
-- Secret logged clearly if missing in production (see src/lib/auth.ts)
+1. Inspect the actual target PostgreSQL version, schema, data constraints, and migration history read-only. This repository has no verified prior Prisma migration baseline; the financial migration is a delta from the pre-payment schema, not a fresh bootstrap.
+2. Create an approved baseline/deployment plan, take and verify a restorable backup, and rehearse the exact SQL against a staging copy with representative data.
+3. Review backfill counts and unresolved non-NGN/out-of-range values, validate ledger triggers and constraints, and obtain database/business-owner approval.
+4. Only then apply the approved schema change through the agreed migration procedure, followed by application deployment. Do not run `prisma migrate deploy`, `prisma db push`, or `prisma db push --accept-data-loss` against a shared/production database before these gates.
 
-## Post-Deploy Check
-- `GET /api/health` → {status:"ok", service:"twt"}
-- `GET /api/auth/session` → should not 500 with MissingSecret
-- Login with demo accounts → correct dashboard per role
+The in-memory PGlite rehearsal is not a substitute for target-database inspection or a staging-copy rehearsal. See `docs/PAYSTACK_MARKETPLACE_IMPLEMENTATION.md` and `docs/UAT_SMOKE_REPORT.md`.
+
+## Health and smoke checks
+
+- `GET /api/health` only confirms that the web route responds; it is not a database, Paystack, or financial readiness check.
+- Verify login/role/ownership boundaries on staging with provisioned test users.
+- In Paystack test mode, verify same-reference handling for uncertain initialization, duplicate/replayed webhooks, mismatches, payouts/refunds, and reconciliation before any live deployment.
+- Never seed demo users or use demo credentials in shared/staging/production environments.
