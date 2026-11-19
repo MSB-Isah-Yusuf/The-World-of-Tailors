@@ -29,7 +29,23 @@ export default async function BookingDetail({ params }: { params: Promise<{ id: 
       statusHistory: { orderBy: { createdAt: "asc" } },
       notes: { orderBy: { createdAt: "desc" }, take: 5 },
     } });
-  } catch {}
+  } catch (error: any) {
+    // Allow customers to review a legacy booking during a staged schema rollout;
+    // quote/payment fields stay absent until their migration has been applied.
+    if (error?.code === "P2022") {
+      try {
+        booking = await prisma.tailoringBooking.findUnique({ where: { id }, select: {
+          id: true, reference: true, customerId: true, tailorId: true, designId: true,
+          description: true, status: true, estimatedCompletion: true, agreedPrice: true,
+          paymentStatus: true,
+          tailor: { select: { businessName: true, slug: true } },
+          design: { select: { title: true, slug: true } },
+          statusHistory: { orderBy: { createdAt: "asc" } },
+          notes: { orderBy: { createdAt: "desc" }, take: 5 },
+        } });
+      } catch {}
+    }
+  }
   if (!booking || booking.customerId !== uid) return <div className="p-8 text-sm dark:text-ivory">Booking not found or not yours.</div>;
 
   const obligation: any = await prisma.paymentObligation.findFirst({ where: { bookingId: id }, orderBy: { createdAt: "desc" }, include: { payments: { select: { id: true, status: true, category: true, amountMinor: true, createdAt: true, refunds: { select: { id: true, amountMinor: true, status: true, reference: true } } } } } }).catch(() => null);

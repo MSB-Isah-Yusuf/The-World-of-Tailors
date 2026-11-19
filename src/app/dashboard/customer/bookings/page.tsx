@@ -15,7 +15,14 @@ export default async function CustomerBookings({ searchParams }: { searchParams:
   try {
     bookings = await prisma.tailoringBooking.findMany({
       where: { customerId: uid, ...(filter ? { status: filter as any } : {}) },
-      include: { tailor: { select: { businessName: true, city: true, slug: true } }, design: { select: { title: true, slug: true } } },
+      // The customer booking list must remain available during the controlled financial-schema rollout.
+      // These scalar fields predate the payment migration; selecting every Prisma scalar would require
+      // newer quote/payment columns to already exist on the target database.
+      select: {
+        id: true, reference: true, status: true, description: true, agreedPrice: true, createdAt: true,
+        tailor: { select: { businessName: true, city: true, slug: true } },
+        design: { select: { title: true, slug: true } },
+      },
       orderBy: { createdAt: "desc" }, take: 20
     });
   } catch {}

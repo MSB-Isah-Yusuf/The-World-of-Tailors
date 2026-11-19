@@ -55,7 +55,10 @@ export default async function NewBooking({ searchParams }: { searchParams: Promi
         status: "REQUESTED",
         measurementSnapshot: snapshot as any,
         agreedPrice: null,
-      }
+      },
+      // Keep the create response to columns in the pre-payment booking schema. The
+      // financial migration is intentionally deployed separately and may lag the app.
+      select: { id: true },
     });
     await prisma.bookingStatusHistory.create({ data: { bookingId: booking.id, toStatus: "REQUESTED", changedBy: (session.user as any).id } });
     await prisma.notification.create({ data: { userId: tailor.userId, title: "New booking request", message: `Booking ${ref} — review ${Object.keys(snapshot).length} measurements`, type: "booking", link: "/dashboard/tailor/bookings" } });

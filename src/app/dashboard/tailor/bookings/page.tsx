@@ -27,9 +27,9 @@ async function transitionBooking(formData: FormData) {
   const toStatus = String(formData.get("toStatus")||"").toUpperCase();
   const message = String(formData.get("message")||"").trim() || undefined;
   const userId = (session.user as any).id;
-  const profile = await prisma.tailorProfile.findUnique({ where: { userId } });
+  const profile = await prisma.tailorProfile.findUnique({ where: { userId }, select: { id: true } });
   if (!profile || !bookingId || !toStatus) redirect("/dashboard/tailor/bookings?error=Missing");
-  const booking = await prisma.tailoringBooking.findUnique({ where: { id: bookingId } });
+  const booking = await prisma.tailoringBooking.findUnique({ where: { id: bookingId }, select: { id: true, tailorId: true, status: true, estimatedCompletion: true, reference: true, customerId: true } });
   if (!booking || booking.tailorId !== profile.id) throw new Error("FORBIDDEN: not owner booking");
   const from = booking.status;
   const allowed = allowedTransitions[from] || [];
@@ -42,7 +42,7 @@ async function transitionBooking(formData: FormData) {
     const days = Number(formData.get("estDays")||7);
     estimatedCompletion = new Date(Date.now() + days*86400000);
   }
-  await prisma.tailoringBooking.update({ where: { id: bookingId }, data: { status: toStatus as any, estimatedCompletion } });
+  await prisma.tailoringBooking.update({ where: { id: bookingId }, data: { status: toStatus as any, estimatedCompletion }, select: { id: true } });
   await prisma.bookingStatusHistory.create({ data: { bookingId, fromStatus: from, toStatus, changedBy: userId, message } });
   await prisma.auditLog.create({ data: { userId, action: "BOOKING_"+from+"_TO_"+toStatus, entity: "TailoringBooking", entityId: bookingId, metadata: { reference: booking.reference, from, to: toStatus } } });
   // Notify customer
@@ -65,7 +65,7 @@ export default async function TailorBookingsPage({ searchParams }: { searchParam
   if (status!=="ALL" && ["REQUESTED","ACCEPTED","IN_PRODUCTION","READY","COMPLETED","DECLINED","CANCELLED","ON_HOLD"].includes(status)) where.status = status;
   if (q) where.OR = [{ reference: { contains: q, mode: "insensitive" } }, { description: { contains: q, mode: "insensitive" } }];
 
-  let bookings:any[]=[], total=0, stats:any={};
+  let bookings:any[]=[], total=0, stats:any={}, financialSchemaReady=true;
   try {
     [total, stats] = await Promise.all([
       prisma.tailoringBooking.count({ where }),
@@ -74,12 +74,30 @@ export default async function TailorBookingsPage({ searchParams }: { searchParam
         const m:any={}; groups.forEach(g=>m[g.status]=g._count); return m;
       })()
     ]);
-    bookings = await prisma.tailoringBooking.findMany({
-      where,
-      include: { customer: { select: { name: true, email: true } }, design: { select: { title: true, slug: true } } },
-      orderBy: { updatedAt: "desc" },
-      skip: (page-1)*pageSize, take: pageSize,
-    });
+    try {
+      bookings = await prisma.tailoringBooking.findMany({
+        where,
+        include: { customer: { select: { name: true, email: true } }, design: { select: { title: true, slug: true } } },
+        orderBy: { updatedAt: "desc" },
+        skip: (page-1)*pageSize, take: pageSize,
+      });
+    } catch (error: any) {
+      // A code-only deployment can precede the separately reviewed financial migration.
+      // Fall back to the established booking columns so submitted measurement snapshots remain visible.
+      if (error?.code !== "P2022") throw error;
+      financialSchemaReady = false;
+      bookings = await prisma.tailoringBooking.findMany({
+        where,
+        select: {
+          id: true, reference: true, description: true, status: true, estimatedCompletion: true,
+          updatedAt: true, measurementSnapshot: true,
+          customer: { select: { name: true, email: true } },
+          design: { select: { title: true, slug: true } },
+        },
+        orderBy: { updatedAt: "desc" },
+        skip: (page-1)*pageSize, take: pageSize,
+      });
+    }
   } catch { bookings=[]; }
 
   const variant:Record<string,any> = { REQUESTED:"warning", ACCEPTED:"secondary", IN_PRODUCTION:"plum", READY:"gold", COMPLETED:"success", DECLINED:"muted", CANCELLED:"muted", ON_HOLD:"burgundy" };
@@ -94,6 +112,7 @@ export default async function TailorBookingsPage({ searchParams }: { searchParam
   ];
 
   return (      <div className="space-y-6">
+        {!financialSchemaReady && <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Booking measurements are available. Quote and payment controls remain paused until the separately reviewed financial database migration is applied.</div>}
         <div>
           <h1 className="font-display text-2xl">Bookings — {profile.businessName}</h1>
           <p className="text-sm text-muted-foreground">Status state-machine validated server-side • Every change records <code>BookingStatusHistory</code> + <code>AuditLog</code> • Only owner tailor can mutate.</p>
@@ -142,8 +161,8 @@ export default async function TailorBookingsPage({ searchParams }: { searchParam
                   {allowedTransitions[b.status]?.length===0 && <span className="text-xs text-muted-foreground">Terminal state — no further transitions. See history in DB: BookingStatusHistory + AuditLog.</span>}
                   <Link href={`/api/v1/bookings/${b.id}`} className="ml-auto text-xs underline text-plum self-center">API</Link>
                 </div>
-                {b.status === "ACCEPTED" && <details className="border-t pt-2 dark:border-white/10"><summary className="cursor-pointer text-xs font-semibold dark:text-gold">{b.quoteStatus === "SENT" ? "Update quote" : "Create tailoring quote"}</summary><TailorQuoteForm bookingId={b.id} /></details>}
-                {b.quoteStatus && b.quoteStatus !== "NOT_QUOTED" && <div className="text-[11px] text-muted-foreground">Quote: {b.quoteStatus} • {b.agreedAmountMinor != null ? `₦${(Number(b.agreedAmountMinor) / 100).toLocaleString()}` : "—"}</div>}
+                {financialSchemaReady && b.status === "ACCEPTED" && <details className="border-t pt-2 dark:border-white/10"><summary className="cursor-pointer text-xs font-semibold dark:text-gold">{b.quoteStatus === "SENT" ? "Update quote" : "Create tailoring quote"}</summary><TailorQuoteForm bookingId={b.id} /></details>}
+                {financialSchemaReady && b.quoteStatus && b.quoteStatus !== "NOT_QUOTED" && <div className="text-[11px] text-muted-foreground">Quote: {b.quoteStatus} • {b.agreedAmountMinor != null ? `₦${(Number(b.agreedAmountMinor) / 100).toLocaleString()}` : "—"}</div>}
               </div>
             ))}
             <div className="flex justify-between text-xs pt-2">
